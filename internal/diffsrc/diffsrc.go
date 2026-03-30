@@ -25,11 +25,23 @@ func DiffFile(path string) ([]byte, error) {
 	return data, nil
 }
 
+func RepoRoot(ctx context.Context, dir string) (string, error) {
+	output, err := gitOutput(ctx, dir, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return "", fmt.Errorf("resolve repo root: %w", err)
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
 func gitDiff(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	gitArgs := []string{"diff", "--no-ext-diff", "--no-color"}
 	gitArgs = append(gitArgs, args...)
 
-	cmd := exec.CommandContext(ctx, "git", gitArgs...)
+	return gitOutput(ctx, dir, gitArgs...)
+}
+
+func gitOutput(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
 
 	var stdout bytes.Buffer
@@ -38,7 +50,7 @@ func gitDiff(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("git diff: %w: %s", err, strings.TrimSpace(stderr.String()))
+		return nil, fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
 	}
 
 	return stdout.Bytes(), nil

@@ -1,0 +1,4 @@
+--- a/prisma/migrations/20260330020101_add_user_timezone/migration.sql
++++ b/prisma/migrations/20260330020101_add_user_timezone/migration.sql
+@@ -0,0 +1 @@
++ALTER TABLE "User" ADD COLUMN "timezone" TEXT;

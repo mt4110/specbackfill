@@ -68,6 +68,32 @@ func TestDiffFile(t *testing.T) {
 	}
 }
 
+func TestRepoRootFromNestedDirectory(t *testing.T) {
+	t.Parallel()
+
+	repo := newGitRepo(t)
+	nested := filepath.Join(repo, "internal", "service")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	root, err := RepoRoot(context.Background(), nested)
+	if err != nil {
+		t.Fatalf("RepoRoot() error = %v", err)
+	}
+	rootResolved, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatalf("EvalSymlinks(root) error = %v", err)
+	}
+	repoResolved, err := filepath.EvalSymlinks(repo)
+	if err != nil {
+		t.Fatalf("EvalSymlinks(repo) error = %v", err)
+	}
+	if rootResolved != repoResolved {
+		t.Fatalf("RepoRoot() = %q, want %q", rootResolved, repoResolved)
+	}
+}
+
 func newGitRepo(t *testing.T) string {
 	t.Helper()
 

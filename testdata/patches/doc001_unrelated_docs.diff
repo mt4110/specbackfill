@@ -1,0 +1,10 @@
+--- a/generated/openapi/client.gen.ts
++++ b/generated/openapi/client.gen.ts
+@@ -1 +1,2 @@
+ export type User = { id: string }
++export type UserList = User[]
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1 +1,2 @@
+ # Changelog
++Clarify local development prerequisites.

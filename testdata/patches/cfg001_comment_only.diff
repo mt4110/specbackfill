@@ -1,0 +1,6 @@
+--- a/internal/config/load.go
++++ b/internal/config/load.go
+@@ -1,2 +1,3 @@
+ func load() {
++  // os.Getenv("NEW_API_TOKEN")
+ }

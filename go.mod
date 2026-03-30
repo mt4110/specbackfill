@@ -1,3 +1,3 @@
 module github.com/mt4110/specbackfill
 
-go 1.25.5
+go 1.23

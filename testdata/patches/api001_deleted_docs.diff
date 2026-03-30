@@ -1,0 +1,12 @@
+--- a/openapi.yaml
++++ b/openapi.yaml
+@@ -1 +1,4 @@
+ paths:
++  /users:
++    get:
++      summary: list users
+--- a/docs/api.md
++++ /dev/null
+@@ -1,2 +0,0 @@
+-API
+-Document the new /users endpoint.

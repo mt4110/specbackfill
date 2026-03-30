@@ -3,6 +3,7 @@ package profile
 import (
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -17,7 +18,7 @@ func Detect(root string) (model.RepoProfile, error) {
 		Migrations: exists(filepath.Join(root, "migrations")) || exists(filepath.Join(root, "db", "migrations")) || exists(filepath.Join(root, "prisma", "migrations")),
 	}
 
-	if err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+	if err := filepath.WalkDir(root, func(currentPath string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -25,15 +26,15 @@ func Detect(root string) (model.RepoProfile, error) {
 			return filepath.SkipDir
 		}
 
-		normalized := filepath.ToSlash(path)
+		normalized := filepath.ToSlash(currentPath)
 		switch {
 		case strings.HasSuffix(normalized, ".proto"):
 			profile.Proto = true
 		case strings.HasSuffix(normalized, "/openapi.yaml"),
 			strings.HasSuffix(normalized, "/openapi.yml"),
 			strings.Contains(normalized, "/openapi/") && (strings.HasSuffix(normalized, ".yaml") || strings.HasSuffix(normalized, ".yml")),
-			filepath.Base(normalized) == "openapi.yaml",
-			filepath.Base(normalized) == "openapi.yml":
+			path.Base(normalized) == "openapi.yaml",
+			path.Base(normalized) == "openapi.yml":
 			profile.OpenAPI = true
 		}
 		return nil

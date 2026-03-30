@@ -30,6 +30,8 @@ func Parse(data []byte) (model.Diff, error) {
 	var currentHunk *model.Hunk
 	var nextOldLine int
 	var nextNewLine int
+	var remainingOldLines int
+	var remainingNewLines int
 	var currentStarted bool
 
 	flushHunk := func() {
@@ -38,6 +40,8 @@ func Parse(data []byte) (model.Diff, error) {
 		}
 		currentFile.Hunks = append(currentFile.Hunks, *currentHunk)
 		currentHunk = nil
+		remainingOldLines = 0
+		remainingNewLines = 0
 	}
 
 	flushFile := func() {
@@ -56,6 +60,10 @@ func Parse(data []byte) (model.Diff, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 
+		if currentHunk != nil && remainingOldLines == 0 && remainingNewLines == 0 {
+			flushHunk()
+		}
+
 		if currentHunk != nil {
 			switch {
 			case strings.HasPrefix(line, "@@ "):
@@ -67,6 +75,8 @@ func Parse(data []byte) (model.Diff, error) {
 				currentHunk = &hunk
 				nextOldLine = hunk.OldStart
 				nextNewLine = hunk.NewStart
+				remainingOldLines = hunk.OldLines
+				remainingNewLines = hunk.NewLines
 				continue
 			case strings.HasPrefix(line, " "):
 				currentHunk.Lines = append(currentHunk.Lines, model.Line{
@@ -77,6 +87,8 @@ func Parse(data []byte) (model.Diff, error) {
 				})
 				nextOldLine++
 				nextNewLine++
+				remainingOldLines--
+				remainingNewLines--
 				continue
 			case strings.HasPrefix(line, "+"):
 				currentHunk.Lines = append(currentHunk.Lines, model.Line{
@@ -85,6 +97,7 @@ func Parse(data []byte) (model.Diff, error) {
 					NewLine: nextNewLine,
 				})
 				nextNewLine++
+				remainingNewLines--
 				continue
 			case strings.HasPrefix(line, "-"):
 				currentHunk.Lines = append(currentHunk.Lines, model.Line{
@@ -93,6 +106,7 @@ func Parse(data []byte) (model.Diff, error) {
 					OldLine: nextOldLine,
 				})
 				nextOldLine++
+				remainingOldLines--
 				continue
 			case line == `\ No newline at end of file`:
 				continue
@@ -123,29 +137,29 @@ func Parse(data []byte) (model.Diff, error) {
 		case strings.HasPrefix(line, "rename from "):
 			currentFile = ensureFile(currentFile)
 			currentFile.Status = model.FileStatusRenamed
-			currentFile.OldPath = parseHeaderPath(strings.TrimPrefix(line, "rename from "))
+			currentFile.OldPath = parseMetadataPath(strings.TrimPrefix(line, "rename from "))
 		case strings.HasPrefix(line, "rename to "):
 			currentFile = ensureFile(currentFile)
 			currentFile.Status = model.FileStatusRenamed
-			currentFile.NewPath = parseHeaderPath(strings.TrimPrefix(line, "rename to "))
+			currentFile.NewPath = parseMetadataPath(strings.TrimPrefix(line, "rename to "))
 		case strings.HasPrefix(line, "copy from "):
 			currentFile = ensureFile(currentFile)
 			currentFile.Status = model.FileStatusCopied
-			currentFile.OldPath = parseHeaderPath(strings.TrimPrefix(line, "copy from "))
+			currentFile.OldPath = parseMetadataPath(strings.TrimPrefix(line, "copy from "))
 		case strings.HasPrefix(line, "copy to "):
 			currentFile = ensureFile(currentFile)
 			currentFile.Status = model.FileStatusCopied
-			currentFile.NewPath = parseHeaderPath(strings.TrimPrefix(line, "copy to "))
+			currentFile.NewPath = parseMetadataPath(strings.TrimPrefix(line, "copy to "))
 		case strings.HasPrefix(line, "--- "):
 			if currentStarted {
 				flushFile()
 			}
 			currentFile = ensureFile(currentFile)
-			currentFile.OldPath = parseHeaderPath(strings.TrimPrefix(line, "--- "))
+			currentFile.OldPath = parsePatchPath(strings.TrimPrefix(line, "--- "))
 			currentStarted = true
 		case strings.HasPrefix(line, "+++ "):
 			currentFile = ensureFile(currentFile)
-			currentFile.NewPath = parseHeaderPath(strings.TrimPrefix(line, "+++ "))
+			currentFile.NewPath = parsePatchPath(strings.TrimPrefix(line, "+++ "))
 			currentStarted = true
 		case strings.HasPrefix(line, "@@ "):
 			if currentFile == nil {
@@ -158,6 +172,8 @@ func Parse(data []byte) (model.Diff, error) {
 			currentHunk = &hunk
 			nextOldLine = hunk.OldStart
 			nextNewLine = hunk.NewStart
+			remainingOldLines = hunk.OldLines
+			remainingNewLines = hunk.NewLines
 			currentStarted = true
 		}
 	}
@@ -189,20 +205,29 @@ func parseGitHeader(line string) (string, string, error) {
 		return "", "", fmt.Errorf("%w: invalid git header %q", ErrMalformedDiff, line)
 	}
 
-	oldPath := parseHeaderPath(rest[:separator])
-	newPath := parseHeaderPath(rest[separator+1:])
+	oldPath := parsePatchPath(rest[:separator])
+	newPath := parsePatchPath(rest[separator+1:])
 	return oldPath, newPath, nil
 }
 
-func parseHeaderPath(raw string) string {
+func parsePatchPath(raw string) string {
 	pathText := strings.TrimSpace(raw)
 	if index := strings.IndexByte(pathText, '\t'); index >= 0 {
 		pathText = pathText[:index]
 	}
 
 	pathText = model.NormalizePath(pathText)
-	pathText = strings.TrimPrefix(pathText, "a/")
-	pathText = strings.TrimPrefix(pathText, "b/")
+	if strings.HasPrefix(pathText, "a/") || strings.HasPrefix(pathText, "b/") {
+		pathText = pathText[2:]
+	}
+	return model.NormalizePath(pathText)
+}
+
+func parseMetadataPath(raw string) string {
+	pathText := strings.TrimSpace(raw)
+	if index := strings.IndexByte(pathText, '\t'); index >= 0 {
+		pathText = pathText[:index]
+	}
 	return model.NormalizePath(pathText)
 }
 

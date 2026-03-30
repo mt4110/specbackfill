@@ -40,6 +40,24 @@ func TestRunInvalidFlagCombinations(t *testing.T) {
 	}
 }
 
+func TestRunHelpExitsZero(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run(context.Background(), t.TempDir(), []string{"-h"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "Usage of check:") {
+		t.Fatalf("stderr = %q, want usage output", stderr.String())
+	}
+}
+
 func TestRunMalformedDiffFile(t *testing.T) {
 	t.Parallel()
 

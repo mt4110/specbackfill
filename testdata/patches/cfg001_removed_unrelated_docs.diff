@@ -1,0 +1,11 @@
+--- a/internal/config/load.go
++++ b/internal/config/load.go
+@@ -1,2 +1,3 @@
+ func load() {
++  token := os.Getenv("NEW_API_TOKEN")
+ }
+--- a/README.md
++++ b/README.md
+@@ -1,2 +1 @@
+ # specbackfill
+-Remove stale roadmap note after launch.

@@ -1,0 +1,4 @@
+--- a/prisma/migrations/20260330030101_prepare_cleanup/migration.sql
++++ b/prisma/migrations/20260330030101_prepare_cleanup/migration.sql
+@@ -0,0 +1 @@
++-- prepare cleanup after rollout

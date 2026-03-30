@@ -1,0 +1,5 @@
+--- a/docs/setup.md
++++ b/docs/setup.md
+@@ -1 +1,2 @@
+ Setup
++Use os.Getenv("NEW_API_TOKEN") in examples.

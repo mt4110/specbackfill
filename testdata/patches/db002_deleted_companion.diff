@@ -1,0 +1,10 @@
+--- a/prisma/migrations/20260330010101_drop_user_email/migration.sql
++++ b/prisma/migrations/20260330010101_drop_user_email/migration.sql
+@@ -1 +1,2 @@
+ ALTER TABLE "User" ADD COLUMN "email" TEXT;
++ALTER TABLE "User" DROP COLUMN "email";
+--- a/UPGRADE.md
++++ /dev/null
+@@ -1,2 +0,0 @@
+-# Upgrade
+-Document the email column removal rollback plan before deployment.

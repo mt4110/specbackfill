@@ -79,9 +79,33 @@ func writeText(w io.Writer, diff model.Diff, result model.Report) error {
 		return err
 	}
 
-	for _, finding := range result.Findings {
+	for index, finding := range result.Findings {
+		if index > 0 {
+			if _, err := fmt.Fprintln(w); err != nil {
+				return err
+			}
+		}
 		if _, err := fmt.Fprintf(w, "[%s] %s %s\n", finding.Severity, finding.RuleID, finding.Title); err != nil {
 			return err
+		}
+		if _, err := fmt.Fprintf(w, "  why: %s\n", finding.Why); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(w, "  evidence:"); err != nil {
+			return err
+		}
+		for _, evidence := range finding.Evidence {
+			if _, err := fmt.Fprintf(w, "    - %s\n", formatEvidence(evidence)); err != nil {
+				return err
+			}
+		}
+		if _, err := fmt.Fprintln(w, "  expected companions:"); err != nil {
+			return err
+		}
+		for _, companion := range finding.ExpectedCompanions {
+			if _, err := fmt.Fprintf(w, "    - %s\n", companion); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -92,4 +116,18 @@ func writeJSON(w io.Writer, result model.Report) error {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
+}
+
+func formatEvidence(evidence model.Evidence) string {
+	kind := evidence.Kind
+	switch evidence.Kind {
+	case string(model.LineKindAdded):
+		kind = "+"
+	case string(model.LineKindRemoved):
+		kind = "-"
+	case string(model.LineKindContext):
+		kind = "~"
+	}
+
+	return fmt.Sprintf("%s:%s %s", evidence.File, kind, evidence.Excerpt)
 }
