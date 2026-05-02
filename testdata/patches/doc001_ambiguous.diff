@@ -1,0 +1,5 @@
+--- a/internal/client/cache.go
++++ b/internal/client/cache.go
+@@ -1 +1,2 @@
+ package client
++const cacheKey = "users"

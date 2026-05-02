@@ -1,0 +1,11 @@
+--- a/schema.prisma
++++ b/schema.prisma
+@@ -1,3 +1,4 @@
+ model User {
+   id Int @id
++  email String @unique
+ }
+--- /dev/null
++++ b/prisma/migrations/20260329010101_add_email/migration.sql
+@@ -0,0 +1 @@
++ALTER TABLE "User" ADD COLUMN "email" TEXT;

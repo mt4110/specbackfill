@@ -1,0 +1,38 @@
+{
+  "version": "v0",
+  "summary": {
+    "error": 1,
+    "warn": 0,
+    "info": 0
+  },
+  "repo_profile": {
+    "go": false,
+    "node": false,
+    "prisma": false,
+    "openapi": false,
+    "proto": false,
+    "migrations": false
+  },
+  "findings": [
+    {
+      "rule_id": "DB001",
+      "severity": "error",
+      "confidence": "high",
+      "title": "Schema changed, but no matching migration companion moved with this diff",
+      "why": "Schema-affecting lines moved in the diff, but no matching migration companion evidence moved with them.",
+      "evidence": [
+        {
+          "file": "schema.prisma",
+          "line": 3,
+          "kind": "added",
+          "excerpt": "email String @unique"
+        }
+      ],
+      "expected_companions": [
+        "migration file",
+        "migration test",
+        "rollback/backfill note"
+      ]
+    }
+  ]
+}

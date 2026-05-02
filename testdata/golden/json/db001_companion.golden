@@ -1,0 +1,17 @@
+{
+  "version": "v0",
+  "summary": {
+    "error": 0,
+    "warn": 0,
+    "info": 0
+  },
+  "repo_profile": {
+    "go": false,
+    "node": false,
+    "prisma": false,
+    "openapi": false,
+    "proto": false,
+    "migrations": false
+  },
+  "findings": []
+}

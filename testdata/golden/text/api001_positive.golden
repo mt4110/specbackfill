@@ -1,0 +1,13 @@
+specbackfill check
+changed files: 1
+findings: error=0 warn=1 info=0
+[warn] API001 Public API changed, but no matching contract-test/docs companion moved with this diff
+  why: An explicit API spec file moved in the diff, but no matching contract-test/docs companion evidence moved with it.
+  evidence:
+    - openapi.yaml:+ /users:
+    - openapi.yaml:+ get:
+    - openapi.yaml:+ summary: list users
+  expected companions:
+    - contract test
+    - API docs
+    - compatibility or deprecation note

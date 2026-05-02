@@ -1,0 +1,20 @@
+specbackfill check
+changed files: 2
+findings: error=1 warn=1 info=0
+[error] DB001 Schema changed, but no matching migration companion moved with this diff
+  why: Schema-affecting lines moved in the diff, but no matching migration companion evidence moved with them.
+  evidence:
+    - schema.prisma:+ nickname String
+  expected companions:
+    - migration file
+    - migration test
+    - rollback/backfill note
+
+[warn] DB002 Destructive storage change detected, but no matching rollback/backfill companion moved with this diff
+  why: Destructive storage lines moved in the diff, but no matching rollback note, backfill note, or compatibility test evidence moved with them.
+  evidence:
+    - prisma/migrations/20260330010101_drop_legacy_login/migration.sql:+ ALTER TABLE "User" DROP COLUMN "legacy_login";
+  expected companions:
+    - rollback note
+    - data backfill note
+    - compatibility test

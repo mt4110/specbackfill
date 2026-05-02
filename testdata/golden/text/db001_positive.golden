@@ -1,0 +1,11 @@
+specbackfill check
+changed files: 1
+findings: error=1 warn=0 info=0
+[error] DB001 Schema changed, but no matching migration companion moved with this diff
+  why: Schema-affecting lines moved in the diff, but no matching migration companion evidence moved with them.
+  evidence:
+    - schema.prisma:+ email String @unique
+  expected companions:
+    - migration file
+    - migration test
+    - rollback/backfill note
