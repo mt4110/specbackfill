@@ -160,6 +160,38 @@ func TestMetadataOnlyCompanionMoveSuppressesFinding(t *testing.T) {
 	}
 }
 
+func TestMetadataOnlyModifiedCompanionSuppressesFinding(t *testing.T) {
+	t.Parallel()
+
+	diff := model.Diff{
+		Files: []model.File{
+			{
+				Path:    "openapi.yaml",
+				OldPath: "openapi.yaml",
+				NewPath: "openapi.yaml",
+				Status:  model.FileStatusModified,
+				Hunks: []model.Hunk{{
+					Lines: []model.Line{{
+						Kind:    model.LineKindAdded,
+						Text:    "  /users:",
+						NewLine: 2,
+					}},
+				}},
+			},
+			{
+				Path:    "docs/api.md",
+				OldPath: "docs/api.md",
+				NewPath: "docs/api.md",
+				Status:  model.FileStatusModified,
+			},
+		},
+	}
+
+	if got := ruleIDs(Evaluate(diff, model.RepoProfile{})); len(got) != 0 {
+		t.Fatalf("ruleIDs = %v, want no findings", got)
+	}
+}
+
 func TestCommentLikeAllowsPointerDerefAndMarkdownCompanionLines(t *testing.T) {
 	t.Parallel()
 

@@ -516,7 +516,7 @@ func isMetadataOnlyCompanionMove(file model.File) bool {
 	}
 
 	switch file.Status {
-	case model.FileStatusAdded, model.FileStatusRenamed, model.FileStatusCopied:
+	case model.FileStatusAdded, model.FileStatusModified, model.FileStatusRenamed, model.FileStatusCopied:
 		return true
 	default:
 		return false
