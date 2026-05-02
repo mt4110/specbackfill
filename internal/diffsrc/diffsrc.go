@@ -11,6 +11,9 @@ import (
 )
 
 func WorkingTree(ctx context.Context, dir string) ([]byte, error) {
+	if hasHead(ctx, dir) {
+		return gitDiff(ctx, dir, "HEAD")
+	}
 	return gitDiff(ctx, dir)
 }
 
@@ -35,6 +38,11 @@ func RepoRoot(ctx context.Context, dir string) (string, error) {
 		return "", fmt.Errorf("resolve repo root: %w", err)
 	}
 	return strings.TrimSpace(string(output)), nil
+}
+
+func hasHead(ctx context.Context, dir string) bool {
+	_, err := gitOutput(ctx, dir, "rev-parse", "--verify", "HEAD")
+	return err == nil
 }
 
 func gitDiff(ctx context.Context, dir string, args ...string) ([]byte, error) {

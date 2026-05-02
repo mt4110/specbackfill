@@ -269,16 +269,22 @@ func parseGitHeader(line string) (string, string, error) {
 		return oldPath, newPath, nil
 	}
 
-	separator := strings.Index(rest, " b/")
-	if !strings.HasPrefix(rest, "a/") || separator == -1 {
-		return "", "", fmt.Errorf("%w: invalid git header %q", ErrMalformedDiff, line)
-	}
-
-	oldPath, err := parseDiffHeaderPath(rest[:separator], "a/")
+	oldToken, remaining, err := consumeGitHeaderPath(rest)
 	if err != nil {
 		return "", "", err
 	}
-	newPath, err := parseDiffHeaderPath(rest[separator+1:], "b/")
+	newToken, remaining, err := consumeGitHeaderPath(remaining)
+	if err != nil {
+		return "", "", err
+	}
+	if strings.TrimSpace(remaining) != "" {
+		return "", "", fmt.Errorf("%w: invalid git header %q", ErrMalformedDiff, line)
+	}
+	oldPath, err := parseDiffHeaderPath(oldToken, "a/")
+	if err != nil {
+		return "", "", err
+	}
+	newPath, err := parseDiffHeaderPath(newToken, "b/")
 	if err != nil {
 		return "", "", err
 	}
@@ -290,10 +296,10 @@ func parseDiffHeaderPath(raw, prefix string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if !strings.HasPrefix(pathText, prefix) {
-		return "", fmt.Errorf("%w: invalid git header path %q", ErrMalformedDiff, raw)
+	if strings.HasPrefix(pathText, prefix) {
+		pathText = strings.TrimPrefix(pathText, prefix)
 	}
-	return model.NormalizePath(strings.TrimPrefix(pathText, prefix)), nil
+	return model.NormalizePath(pathText), nil
 }
 
 func parsePatchPath(raw string) (string, error) {

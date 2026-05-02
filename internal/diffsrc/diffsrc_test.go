@@ -28,6 +28,26 @@ func TestWorkingTree(t *testing.T) {
 	}
 }
 
+func TestWorkingTreeIncludesStagedChanges(t *testing.T) {
+	t.Parallel()
+
+	repo := newGitRepo(t)
+	writeFile(t, filepath.Join(repo, "schema.prisma"), "model User {\n  id Int @id\n}\n")
+	runGit(t, repo, "add", "schema.prisma")
+	runGit(t, repo, "commit", "-m", "initial")
+
+	writeFile(t, filepath.Join(repo, "schema.prisma"), "model User {\n  id Int @id\n  email String @unique\n}\n")
+	runGit(t, repo, "add", "schema.prisma")
+
+	diff, err := WorkingTree(context.Background(), repo)
+	if err != nil {
+		t.Fatalf("WorkingTree() error = %v", err)
+	}
+	if !strings.Contains(string(diff), "email String @unique") {
+		t.Fatalf("WorkingTree() diff does not include staged schema change:\n%s", diff)
+	}
+}
+
 func TestGitRange(t *testing.T) {
 	t.Parallel()
 
