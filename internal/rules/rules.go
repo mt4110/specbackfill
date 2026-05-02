@@ -163,7 +163,7 @@ func evaluateAUTH001(diff model.Diff) (model.Finding, bool) {
 	if len(evidence) == 0 {
 		return model.Finding{}, false
 	}
-	if hasAUTH001Companion(diff, extractAUTH001SearchTerms(evidence)) {
+	if hasAUTH001Companion(diff, buildAUTH001CompanionContext(evidence)) {
 		return model.Finding{}, false
 	}
 
@@ -506,7 +506,12 @@ func matchesAUTH001Line(text string) bool {
 	return false
 }
 
-func hasAUTH001Companion(diff model.Diff, terms []string) bool {
+type auth001CompanionContext struct {
+	terms             []string
+	fallbackPathTerms []string
+}
+
+func hasAUTH001Companion(diff model.Diff, context auth001CompanionContext) bool {
 	hasAllow := false
 	hasDeny := false
 
@@ -514,7 +519,7 @@ func hasAUTH001Companion(diff model.Diff, terms []string) bool {
 		if file.Status == model.FileStatusDeleted {
 			continue
 		}
-		if isAUTH001SecurityNotePath(file.Path) && fileHasAUTH001SecurityNote(file, terms) {
+		if isAUTH001SecurityNotePath(file.Path) && fileHasAUTH001SecurityNote(file, context) {
 			return true
 		}
 		if !isAUTH001TestPath(file.Path) {
@@ -525,7 +530,7 @@ func hasAUTH001Companion(diff model.Diff, terms []string) bool {
 				if line.Kind != model.LineKindAdded || strings.TrimSpace(line.Text) == "" || isCommentLike(line.Text) {
 					continue
 				}
-				if !companionTermsMatch(file, line, terms) {
+				if !matchesAUTH001CompanionContext(file, line, context) {
 					continue
 				}
 				if isAUTH001AllowLine(line.Text) {
@@ -544,16 +549,81 @@ func hasAUTH001Companion(diff model.Diff, terms []string) bool {
 	return false
 }
 
-func extractAUTH001SearchTerms(evidence []model.Evidence) []string {
-	rawTerms := extractSearchTerms(evidence)
-	terms := make([]string, 0, len(rawTerms))
-	for _, term := range rawTerms {
-		if _, blocked := ignoredAUTH001SearchTerms[term]; blocked {
-			continue
-		}
-		terms = append(terms, term)
+func buildAUTH001CompanionContext(evidence []model.Evidence) auth001CompanionContext {
+	return auth001CompanionContext{
+		terms:             extractAUTH001SearchTerms(evidence),
+		fallbackPathTerms: extractAUTH001FallbackPathTerms(evidence),
 	}
+}
+
+func extractAUTH001SearchTerms(evidence []model.Evidence) []string {
+	seen := map[string]struct{}{}
+	terms := make([]string, 0, 8)
+
+	for _, evidenceItem := range evidence {
+		for _, token := range termTokenRE.FindAllString(evidenceItem.Excerpt, -1) {
+			addAUTH001SearchTerms(seen, &terms, token)
+		}
+	}
+
 	return terms
+}
+
+func addAUTH001SearchTerms(seen map[string]struct{}, terms *[]string, token string) {
+	cleaned := strings.ToLower(strings.Trim(token, "\"'`:,()[]{}<>"))
+	if cleaned == "" {
+		return
+	}
+
+	addAUTH001SearchTerm(seen, terms, cleaned)
+	for _, part := range strings.FieldsFunc(cleaned, func(r rune) bool {
+		return r == '/' || r == '_' || r == '-' || r == '.'
+	}) {
+		addAUTH001SearchTerm(seen, terms, part)
+	}
+	if strings.HasSuffix(cleaned, "s") && !strings.HasSuffix(cleaned, "ss") {
+		addAUTH001SearchTerm(seen, terms, strings.TrimSuffix(cleaned, "s"))
+	}
+}
+
+func addAUTH001SearchTerm(seen map[string]struct{}, terms *[]string, term string) {
+	if _, blocked := ignoredAUTH001SearchTerms[term]; blocked {
+		return
+	}
+	addSearchTerm(seen, terms, term)
+}
+
+func extractAUTH001FallbackPathTerms(evidence []model.Evidence) []string {
+	seen := map[string]struct{}{}
+	terms := make([]string, 0, len(evidence))
+
+	for _, evidenceItem := range evidence {
+		base := strings.ToLower(path.Base(evidenceItem.File))
+		if ext := path.Ext(base); ext != "" {
+			base = strings.TrimSuffix(base, ext)
+		}
+		addAUTH001FallbackPathTerm(seen, &terms, base)
+		for _, segment := range strings.Split(strings.ToLower(path.Dir(evidenceItem.File)), "/") {
+			addAUTH001FallbackPathTerm(seen, &terms, segment)
+		}
+	}
+
+	return terms
+}
+
+func addAUTH001FallbackPathTerm(seen map[string]struct{}, terms *[]string, term string) {
+	if len(term) < 3 {
+		return
+	}
+	if _, blocked := ignoredAUTH001FallbackPathTerms[term]; blocked {
+		return
+	}
+	if _, exists := seen[term]; exists {
+		return
+	}
+
+	seen[term] = struct{}{}
+	*terms = append(*terms, term)
 }
 
 var ignoredAUTH001SearchTerms = map[string]struct{}{
@@ -578,27 +648,64 @@ var ignoredAUTH001SearchTerms = map[string]struct{}{
 	"users":          {},
 }
 
+var ignoredAUTH001FallbackPathTerms = map[string]struct{}{
+	"acl":            {},
+	"auth":           {},
+	"authentication": {},
+	"authorization":  {},
+	"authn":          {},
+	"authz":          {},
+	"internal":       {},
+	"middleware":     {},
+	"middlewares":    {},
+	"permission":     {},
+	"permissions":    {},
+	"policy":         {},
+	"policies":       {},
+	"rbac":           {},
+}
+
+func matchesAUTH001CompanionContext(file model.File, line model.Line, context auth001CompanionContext) bool {
+	if companionTermsMatch(file, line, context.terms) {
+		return true
+	}
+	if len(context.terms) != 0 {
+		return false
+	}
+
+	lowerPath := strings.ToLower(file.Path)
+	lowerText := strings.ToLower(line.Text)
+	for _, term := range context.fallbackPathTerms {
+		if strings.Contains(lowerPath, term) || strings.Contains(lowerText, term) {
+			return true
+		}
+	}
+	return false
+}
+
 func isAUTH001TestPath(filePath string) bool {
 	return isConventionalTestPath(filePath)
 }
 
 func isAUTH001SecurityNotePath(filePath string) bool {
+	if isGeneratedPath(filePath) || isExamplePath(filePath) || isConventionalTestPath(filePath) {
+		return false
+	}
 	if isDocCompanionPath(filePath) {
 		return true
 	}
 
-	lower := strings.ToLower(filePath)
 	base := strings.ToLower(path.Base(filePath))
-	return base == "security.md" || hasPathSegment(lower, "security")
+	return base == "security.md"
 }
 
-func fileHasAUTH001SecurityNote(file model.File, terms []string) bool {
+func fileHasAUTH001SecurityNote(file model.File, context auth001CompanionContext) bool {
 	for _, hunk := range file.Hunks {
 		for _, line := range hunk.Lines {
 			if line.Kind != model.LineKindAdded || strings.TrimSpace(line.Text) == "" {
 				continue
 			}
-			if !companionTermsMatch(file, line, terms) {
+			if !matchesAUTH001CompanionContext(file, line, context) {
 				continue
 			}
 			if isAUTH001SecurityNoteLine(line.Text) {
