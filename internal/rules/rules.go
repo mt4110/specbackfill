@@ -509,6 +509,7 @@ func matchesAUTH001Line(text string) bool {
 type auth001CompanionContext struct {
 	terms             []string
 	fallbackPathTerms []string
+	evidencePaths     []string
 }
 
 func hasAUTH001Companion(diff model.Diff, context auth001CompanionContext) bool {
@@ -553,6 +554,7 @@ func buildAUTH001CompanionContext(evidence []model.Evidence) auth001CompanionCon
 	return auth001CompanionContext{
 		terms:             extractAUTH001SearchTerms(evidence),
 		fallbackPathTerms: extractAUTH001FallbackPathTerms(evidence),
+		evidencePaths:     extractAUTH001EvidencePaths(evidence),
 	}
 }
 
@@ -609,6 +611,25 @@ func extractAUTH001FallbackPathTerms(evidence []model.Evidence) []string {
 	}
 
 	return terms
+}
+
+func extractAUTH001EvidencePaths(evidence []model.Evidence) []string {
+	seen := map[string]struct{}{}
+	paths := make([]string, 0, len(evidence))
+
+	for _, evidenceItem := range evidence {
+		normalized := strings.ToLower(evidenceItem.File)
+		if normalized == "" {
+			continue
+		}
+		if _, exists := seen[normalized]; exists {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		paths = append(paths, normalized)
+	}
+
+	return paths
 }
 
 func addAUTH001FallbackPathTerm(seen map[string]struct{}, terms *[]string, term string) {
@@ -669,9 +690,6 @@ func matchesAUTH001CompanionContext(file model.File, line model.Line, context au
 	if companionTermsMatch(file, line, context.terms) {
 		return true
 	}
-	if len(context.terms) == 0 && len(context.fallbackPathTerms) == 0 {
-		return true
-	}
 
 	lowerPath := strings.ToLower(file.Path)
 	lowerText := strings.ToLower(line.Text)
@@ -680,6 +698,28 @@ func matchesAUTH001CompanionContext(file model.File, line model.Line, context au
 			return true
 		}
 	}
+	return len(context.terms) == 0 &&
+		len(context.fallbackPathTerms) == 0 &&
+		isAUTH001RelatedEmptyContextCompanion(lowerPath, context)
+}
+
+func isAUTH001RelatedEmptyContextCompanion(filePath string, context auth001CompanionContext) bool {
+	if !isAUTH001TestPath(filePath) {
+		return false
+	}
+
+	companionDir := path.Dir(filePath)
+	companionBase := strings.TrimSuffix(path.Base(filePath), path.Ext(filePath))
+	companionBase = strings.TrimSuffix(companionBase, "_test")
+
+	for _, evidencePath := range context.evidencePaths {
+		evidenceDir := path.Dir(evidencePath)
+		evidenceBase := strings.TrimSuffix(path.Base(evidencePath), path.Ext(evidencePath))
+		if companionDir == evidenceDir || companionBase == evidenceBase {
+			return true
+		}
+	}
+
 	return false
 }
 
