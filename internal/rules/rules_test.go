@@ -117,6 +117,17 @@ func TestFindingsIncludeRequiredFields(t *testing.T) {
 	}
 }
 
+func TestAPIPathMatchingIsCaseInsensitiveForPathSegments(t *testing.T) {
+	t.Parallel()
+
+	if !isAPIPath("api/OpenAPI/users.yaml") {
+		t.Fatalf("isAPIPath() = false, want true for OpenAPI path segment")
+	}
+	if !isAPIPath("Proto/users.proto") {
+		t.Fatalf("isAPIPath() = false, want true for proto path segment")
+	}
+}
+
 func parseFixture(t *testing.T, name string) model.Diff {
 	t.Helper()
 

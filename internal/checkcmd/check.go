@@ -114,7 +114,7 @@ func resolveRoots(ctx context.Context, cwd, diffFile string) (string, string, er
 func loadDiff(ctx context.Context, cwd, base, head, diffFile string) ([]byte, error) {
 	switch {
 	case diffFile != "":
-		return diffsrc.DiffFile(diffFile)
+		return diffsrc.DiffFile(cwd, diffFile)
 	case base != "" && head != "":
 		return diffsrc.GitRange(ctx, cwd, base, head)
 	default:

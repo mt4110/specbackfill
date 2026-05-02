@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -17,7 +18,10 @@ func GitRange(ctx context.Context, dir, base, head string) ([]byte, error) {
 	return gitDiff(ctx, dir, base, head)
 }
 
-func DiffFile(path string) ([]byte, error) {
+func DiffFile(dir, path string) ([]byte, error) {
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(dir, path)
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read diff file: %w", err)

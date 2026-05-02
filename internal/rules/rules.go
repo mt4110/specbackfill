@@ -376,12 +376,13 @@ func isCFGCompanionPath(filePath string) bool {
 func isAPIPath(filePath string) bool {
 	base := path.Base(filePath)
 	lowerBase := strings.ToLower(base)
+	lowerPath := strings.ToLower(filePath)
 	switch {
 	case base == "schema.graphql":
 		return true
-	case (strings.HasPrefix(lowerBase, "openapi") || strings.Contains(filePath, "/openapi/")) && (strings.HasSuffix(lowerBase, ".yaml") || strings.HasSuffix(lowerBase, ".yml")):
+	case (strings.HasPrefix(lowerBase, "openapi") || strings.Contains(lowerPath, "/openapi/")) && (strings.HasSuffix(lowerBase, ".yaml") || strings.HasSuffix(lowerBase, ".yml")):
 		return true
-	case strings.HasSuffix(filePath, ".proto") && (strings.HasPrefix(filePath, "proto/") || strings.Contains(filePath, "/proto/")):
+	case strings.HasSuffix(lowerPath, ".proto") && (strings.HasPrefix(lowerPath, "proto/") || strings.Contains(lowerPath, "/proto/")):
 		return true
 	default:
 		return false

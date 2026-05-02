@@ -59,7 +59,23 @@ func TestDiffFile(t *testing.T) {
 	want := "--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new\n"
 	writeFile(t, path, want)
 
-	got, err := DiffFile(path)
+	got, err := DiffFile(t.TempDir(), path)
+	if err != nil {
+		t.Fatalf("DiffFile() error = %v", err)
+	}
+	if string(got) != want {
+		t.Fatalf("DiffFile() = %q, want %q", got, want)
+	}
+}
+
+func TestDiffFileResolvesRelativePathFromDir(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	want := "--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new\n"
+	writeFile(t, filepath.Join(dir, "sample.diff"), want)
+
+	got, err := DiffFile(dir, "sample.diff")
 	if err != nil {
 		t.Fatalf("DiffFile() error = %v", err)
 	}

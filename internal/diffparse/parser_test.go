@@ -50,6 +50,17 @@ func TestParseMalformedDiff(t *testing.T) {
 	}
 }
 
+func TestParseTruncatedHunk(t *testing.T) {
+	t.Parallel()
+
+	input := []byte("--- a/file.txt\n+++ b/file.txt\n@@ -1,2 +1,2 @@\n old\n")
+
+	_, err := Parse(input)
+	if !errors.Is(err, ErrMalformedDiff) {
+		t.Fatalf("Parse() error = %v, want ErrMalformedDiff", err)
+	}
+}
+
 func TestParseMixedNewlines(t *testing.T) {
 	t.Parallel()
 

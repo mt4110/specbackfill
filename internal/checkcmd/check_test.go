@@ -101,6 +101,28 @@ func TestRunDiffFileJSON(t *testing.T) {
 	}
 }
 
+func TestRunDiffFileUsesProvidedCwdForRelativePath(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	diffPath := filepath.Join(dir, "change.diff")
+	diffText := "--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new\n"
+	if err := os.WriteFile(diffPath, []byte(diffText), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run(context.Background(), dir, []string{"--diff-file", "change.diff", "--format", "json"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"version": "v0"`) {
+		t.Fatalf("stdout = %q, want JSON skeleton", stdout.String())
+	}
+}
+
 func TestRunFailOnModesWithoutRules(t *testing.T) {
 	t.Parallel()
 

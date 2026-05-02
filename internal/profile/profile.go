@@ -22,7 +22,7 @@ func Detect(root string) (model.RepoProfile, error) {
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() && entry.Name() == ".git" {
+		if entry.IsDir() && shouldSkipProfileDir(entry.Name()) {
 			return filepath.SkipDir
 		}
 
@@ -43,6 +43,15 @@ func Detect(root string) (model.RepoProfile, error) {
 	}
 
 	return profile, nil
+}
+
+func shouldSkipProfileDir(name string) bool {
+	switch name {
+	case ".git", ".next", "build", "dist", "node_modules", "vendor":
+		return true
+	default:
+		return false
+	}
 }
 
 func exists(path string) bool {

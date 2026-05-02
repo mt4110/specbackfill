@@ -35,6 +35,10 @@ func Parse(data []byte) (model.Diff, error) {
 	var remainingNewLines int
 	var currentStarted bool
 
+	hunkComplete := func() bool {
+		return remainingOldLines == 0 && remainingNewLines == 0
+	}
+
 	flushHunk := func() {
 		if currentFile == nil || currentHunk == nil {
 			return
@@ -45,9 +49,12 @@ func Parse(data []byte) (model.Diff, error) {
 		remainingNewLines = 0
 	}
 
-	flushFile := func() {
+	flushFile := func() error {
 		if currentFile == nil {
-			return
+			return nil
+		}
+		if currentHunk != nil && !hunkComplete() {
+			return fmt.Errorf("%w: truncated hunk %q", ErrMalformedDiff, currentHunk.Header)
 		}
 		flushHunk()
 		finalizeFile(currentFile)
@@ -56,18 +63,22 @@ func Parse(data []byte) (model.Diff, error) {
 		}
 		currentFile = nil
 		currentStarted = false
+		return nil
 	}
 
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		if currentHunk != nil && remainingOldLines == 0 && remainingNewLines == 0 {
+		if currentHunk != nil && hunkComplete() {
 			flushHunk()
 		}
 
 		if currentHunk != nil {
 			switch {
 			case strings.HasPrefix(line, "@@ "):
+				if !hunkComplete() {
+					return model.Diff{}, fmt.Errorf("%w: truncated hunk before %q", ErrMalformedDiff, line)
+				}
 				flushHunk()
 				hunk, err := parseHunkHeader(line)
 				if err != nil {
@@ -80,6 +91,9 @@ func Parse(data []byte) (model.Diff, error) {
 				remainingNewLines = hunk.NewLines
 				continue
 			case strings.HasPrefix(line, " "):
+				if remainingOldLines <= 0 || remainingNewLines <= 0 {
+					return model.Diff{}, fmt.Errorf("%w: too many context lines in hunk %q", ErrMalformedDiff, currentHunk.Header)
+				}
 				currentHunk.Lines = append(currentHunk.Lines, model.Line{
 					Kind:    model.LineKindContext,
 					Text:    line[1:],
@@ -92,6 +106,9 @@ func Parse(data []byte) (model.Diff, error) {
 				remainingNewLines--
 				continue
 			case strings.HasPrefix(line, "+"):
+				if remainingNewLines <= 0 {
+					return model.Diff{}, fmt.Errorf("%w: too many added lines in hunk %q", ErrMalformedDiff, currentHunk.Header)
+				}
 				currentHunk.Lines = append(currentHunk.Lines, model.Line{
 					Kind:    model.LineKindAdded,
 					Text:    line[1:],
@@ -101,6 +118,9 @@ func Parse(data []byte) (model.Diff, error) {
 				remainingNewLines--
 				continue
 			case strings.HasPrefix(line, "-"):
+				if remainingOldLines <= 0 {
+					return model.Diff{}, fmt.Errorf("%w: too many removed lines in hunk %q", ErrMalformedDiff, currentHunk.Header)
+				}
 				currentHunk.Lines = append(currentHunk.Lines, model.Line{
 					Kind:    model.LineKindRemoved,
 					Text:    line[1:],
@@ -112,13 +132,18 @@ func Parse(data []byte) (model.Diff, error) {
 			case line == `\ No newline at end of file`:
 				continue
 			default:
+				if !hunkComplete() {
+					return model.Diff{}, fmt.Errorf("%w: truncated hunk before %q", ErrMalformedDiff, line)
+				}
 				flushHunk()
 			}
 		}
 
 		switch {
 		case strings.HasPrefix(line, "diff --git "):
-			flushFile()
+			if err := flushFile(); err != nil {
+				return model.Diff{}, err
+			}
 			oldPath, newPath, err := parseGitHeader(line)
 			if err != nil {
 				return model.Diff{}, err
@@ -169,7 +194,9 @@ func Parse(data []byte) (model.Diff, error) {
 			currentFile.NewPath = pathText
 		case strings.HasPrefix(line, "--- "):
 			if currentStarted {
-				flushFile()
+				if err := flushFile(); err != nil {
+					return model.Diff{}, err
+				}
 			}
 			currentFile = ensureFile(currentFile)
 			pathText, err := parsePatchPath(strings.TrimPrefix(line, "--- "))
@@ -207,7 +234,9 @@ func Parse(data []byte) (model.Diff, error) {
 		return model.Diff{}, fmt.Errorf("scan diff: %w", err)
 	}
 
-	flushFile()
+	if err := flushFile(); err != nil {
+		return model.Diff{}, err
+	}
 
 	if len(diff.Files) == 0 {
 		return model.Diff{}, ErrMalformedDiff
