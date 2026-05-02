@@ -14,7 +14,7 @@ func WorkingTree(ctx context.Context, dir string) ([]byte, error) {
 	if hasHead(ctx, dir) {
 		return gitDiff(ctx, dir, "HEAD")
 	}
-	return gitDiff(ctx, dir)
+	return unbornWorkingTreeDiff(ctx, dir)
 }
 
 func GitRange(ctx context.Context, dir, base, head string) ([]byte, error) {
@@ -43,6 +43,26 @@ func RepoRoot(ctx context.Context, dir string) (string, error) {
 func hasHead(ctx context.Context, dir string) bool {
 	_, err := gitOutput(ctx, dir, "rev-parse", "--verify", "HEAD")
 	return err == nil
+}
+
+func unbornWorkingTreeDiff(ctx context.Context, dir string) ([]byte, error) {
+	cached, err := gitDiff(ctx, dir, "--cached")
+	if err != nil {
+		return nil, err
+	}
+
+	unstaged, err := gitDiff(ctx, dir)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(cached) == 0 {
+		return unstaged, nil
+	}
+	if len(unstaged) == 0 {
+		return cached, nil
+	}
+	return append(cached, unstaged...), nil
 }
 
 func gitDiff(ctx context.Context, dir string, args ...string) ([]byte, error) {
