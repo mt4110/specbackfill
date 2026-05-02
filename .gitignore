@@ -4,3 +4,4 @@
 .codex/
 .codex-*
 docs/prompt/
+.private_docs/

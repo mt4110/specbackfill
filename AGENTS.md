@@ -147,3 +147,20 @@ Do not emit broad findings from path names alone unless the phase explicitly all
 
 The fastest way to damage this product is to make it sound smarter than it is.
 Be narrow, explicit, and evidence-first.
+
+## 11. `.private_docs` local design contract
+
+If `.private_docs/` exists, treat it as local design context. It is intentionally ignored and should not be mixed into the public PR surface.
+
+Every implementation, rule, fixture, CLI, output, or documentation change must still check whether the change satisfies the design contracts in `.private_docs/`.
+
+Required behavior:
+
+1. Read the relevant `.private_docs/*.md` files before changing behavior.
+2. Preserve their invariants.
+3. Do not commit `.private_docs/` unless the user explicitly asks to publish that local material.
+4. If a local invariant should become public or project-binding, promote the public-safe wording into `docs/v0-spec.md`, `AGENTS.md`, or the READMEs instead of committing `.private_docs/`.
+5. Do not store secrets, private diffs, tokens, personal data, or raw proprietary review data in `.private_docs/`.
+6. If downstream data from `local-ai-review` is used for rule calibration, commit only public-safe summaries, fixtures, and design rationale outside `.private_docs/`.
+
+A change that ignores `.private_docs/` is incomplete even if `go test ./...` passes.
