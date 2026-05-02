@@ -231,6 +231,29 @@ func TestCommentLikeAllowsPointerDerefAndMarkdownCompanionLines(t *testing.T) {
 	}
 }
 
+func TestAUTH001AllowDenyMarkersAreTokenBased(t *testing.T) {
+	t.Parallel()
+
+	if !isAUTH001AllowLine(`t.Run("allows valid user", func(t *testing.T) {})`) {
+		t.Fatalf("isAUTH001AllowLine() = false, want true for allows marker")
+	}
+	if !isAUTH001AllowLine(`assert.Equal(t, http.StatusOK, status)`) {
+		t.Fatalf("isAUTH001AllowLine() = false, want true for StatusOK marker")
+	}
+	if isAUTH001AllowLine(`t.Run("disallows viewer", func(t *testing.T) {})`) {
+		t.Fatalf("isAUTH001AllowLine() = true, want false for disallows marker")
+	}
+	if isAUTH001AllowLine(`t.Run("unsuccessful login", func(t *testing.T) {})`) {
+		t.Fatalf("isAUTH001AllowLine() = true, want false for unsuccessful marker")
+	}
+	if !isAUTH001DenyLine(`t.Run("disallows viewer", func(t *testing.T) {})`) {
+		t.Fatalf("isAUTH001DenyLine() = false, want true for disallows marker")
+	}
+	if !isAUTH001DenyLine(`assert.Equal(t, http.StatusForbidden, status)`) {
+		t.Fatalf("isAUTH001DenyLine() = false, want true for StatusForbidden marker")
+	}
+}
+
 func parseFixture(t *testing.T, name string) model.Diff {
 	t.Helper()
 

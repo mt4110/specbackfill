@@ -717,23 +717,76 @@ func fileHasAUTH001SecurityNote(file model.File, context auth001CompanionContext
 }
 
 func isAUTH001AllowLine(text string) bool {
-	lower := strings.ToLower(text)
-	for _, marker := range []string{"allow", "allowed", "permit", "permitted", "grant", "granted", "success", "statusok", "status ok", "200"} {
-		if strings.Contains(lower, marker) {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(strings.ToLower(text), "status ok") || hasAUTH001LineMarker(text, auth001AllowMarkers)
 }
 
 func isAUTH001DenyLine(text string) bool {
+	return hasAUTH001LineMarker(text, auth001DenyMarkers)
+}
+
+func hasAUTH001LineMarker(text string, markers map[string]struct{}) bool {
 	lower := strings.ToLower(text)
-	for _, marker := range []string{"deny", "denied", "denies", "reject", "rejected", "forbid", "forbidden", "unauthorized", "unauthenticated", "statusforbidden", "statusunauthorized", "403", "401"} {
-		if strings.Contains(lower, marker) {
+	for _, token := range termTokenRE.FindAllString(lower, -1) {
+		cleaned := strings.Trim(token, "\"'`:,()[]{}<>")
+		if hasAUTH001MarkerToken(cleaned, markers) {
 			return true
 		}
+		for _, part := range strings.FieldsFunc(cleaned, func(r rune) bool {
+			return r == '/' || r == '_' || r == '-' || r == '.'
+		}) {
+			if hasAUTH001MarkerToken(part, markers) {
+				return true
+			}
+		}
 	}
+
 	return false
+}
+
+func hasAUTH001MarkerToken(token string, markers map[string]struct{}) bool {
+	if token == "" {
+		return false
+	}
+	_, ok := markers[token]
+	return ok
+}
+
+var auth001AllowMarkers = map[string]struct{}{
+	"200":       {},
+	"allow":     {},
+	"allowed":   {},
+	"allows":    {},
+	"grant":     {},
+	"granted":   {},
+	"grants":    {},
+	"permit":    {},
+	"permits":   {},
+	"permitted": {},
+	"statusok":  {},
+	"success":   {},
+	"succeeded": {},
+	"succeeds":  {},
+}
+
+var auth001DenyMarkers = map[string]struct{}{
+	"401":                {},
+	"403":                {},
+	"denied":             {},
+	"denies":             {},
+	"deny":               {},
+	"disallow":           {},
+	"disallowed":         {},
+	"disallows":          {},
+	"forbid":             {},
+	"forbidden":          {},
+	"forbids":            {},
+	"reject":             {},
+	"rejected":           {},
+	"rejects":            {},
+	"statusforbidden":    {},
+	"statusunauthorized": {},
+	"unauthenticated":    {},
+	"unauthorized":       {},
 }
 
 func isAUTH001SecurityNoteLine(text string) bool {
