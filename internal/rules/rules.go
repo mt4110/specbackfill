@@ -520,6 +520,9 @@ func hasAUTH001Companion(diff model.Diff, context auth001CompanionContext) bool 
 		if file.Status == model.FileStatusDeleted {
 			continue
 		}
+		if isAUTH001MetadataCompanionMove(file, context) {
+			return true
+		}
 		if isAUTH001SecurityNotePath(file.Path) && fileHasAUTH001SecurityNote(file, context) {
 			return true
 		}
@@ -690,6 +693,12 @@ func matchesAUTH001CompanionContext(file model.File, line model.Line, context au
 	if companionTermsMatch(file, line, context.terms) {
 		return true
 	}
+	if isAUTH001EmptyContext(context) {
+		if isAUTH001SecurityNotePath(file.Path) {
+			return true
+		}
+		return isAUTH001RelatedTestCompanionPath(strings.ToLower(file.Path), context)
+	}
 
 	lowerPath := strings.ToLower(file.Path)
 	lowerText := strings.ToLower(line.Text)
@@ -698,14 +707,37 @@ func matchesAUTH001CompanionContext(file model.File, line model.Line, context au
 			return true
 		}
 	}
-	return len(context.terms) == 0 &&
-		len(context.fallbackPathTerms) == 0 &&
-		isAUTH001RelatedEmptyContextCompanion(lowerPath, context)
+	return false
 }
 
-func isAUTH001RelatedEmptyContextCompanion(filePath string, context auth001CompanionContext) bool {
+func isAUTH001EmptyContext(context auth001CompanionContext) bool {
+	return len(context.terms) == 0 && len(context.fallbackPathTerms) == 0
+}
+
+func isAUTH001MetadataCompanionMove(file model.File, context auth001CompanionContext) bool {
+	if !isMetadataOnlyCompanionMove(file) {
+		return false
+	}
+	if isAUTH001SecurityNotePath(file.Path) {
+		return true
+	}
+	return isAUTH001RelatedTestCompanionPath(strings.ToLower(file.Path), context)
+}
+
+func isAUTH001RelatedTestCompanionPath(filePath string, context auth001CompanionContext) bool {
 	if !isAUTH001TestPath(filePath) {
 		return false
+	}
+
+	for _, term := range context.terms {
+		if strings.Contains(filePath, term) {
+			return true
+		}
+	}
+	for _, term := range context.fallbackPathTerms {
+		if strings.Contains(filePath, term) {
+			return true
+		}
 	}
 
 	companionDir := path.Dir(filePath)
