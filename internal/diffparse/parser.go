@@ -1,7 +1,6 @@
 package diffparse
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -22,9 +21,6 @@ func Parse(data []byte) (model.Diff, error) {
 	if len(bytes.TrimSpace(normalized)) == 0 {
 		return model.Diff{}, nil
 	}
-
-	scanner := bufio.NewScanner(bytes.NewReader(normalized))
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
 	var diff model.Diff
 	var currentFile *model.File
@@ -66,9 +62,7 @@ func Parse(data []byte) (model.Diff, error) {
 		return nil
 	}
 
-	for scanner.Scan() {
-		line := scanner.Text()
-
+	for _, line := range splitLines(normalized) {
 		if currentHunk != nil && hunkComplete() {
 			flushHunk()
 		}
@@ -230,10 +224,6 @@ func Parse(data []byte) (model.Diff, error) {
 		}
 	}
 
-	if err := scanner.Err(); err != nil {
-		return model.Diff{}, fmt.Errorf("scan diff: %w", err)
-	}
-
 	if err := flushFile(); err != nil {
 		return model.Diff{}, err
 	}
@@ -371,6 +361,19 @@ func consumeGitHeaderPath(input string) (string, string, error) {
 func normalizeNewlines(data []byte) []byte {
 	normalized := bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
 	return bytes.ReplaceAll(normalized, []byte("\r"), []byte("\n"))
+}
+
+func splitLines(data []byte) []string {
+	rawLines := bytes.Split(data, []byte("\n"))
+	if len(rawLines) > 0 && len(rawLines[len(rawLines)-1]) == 0 {
+		rawLines = rawLines[:len(rawLines)-1]
+	}
+
+	lines := make([]string, 0, len(rawLines))
+	for _, rawLine := range rawLines {
+		lines = append(lines, string(rawLine))
+	}
+	return lines
 }
 
 func parseHunkHeader(line string) (model.Hunk, error) {

@@ -487,18 +487,21 @@ func isConventionalTestPath(filePath string) bool {
 
 func isCommentLike(text string) bool {
 	trimmed := strings.TrimSpace(text)
-	for _, prefix := range []string{"//", "#", "*", "/*", "<!--", "--"} {
+	for _, prefix := range []string{"//", "#", "/*", "*/", "<!--", "--"} {
 		if strings.HasPrefix(trimmed, prefix) {
 			return true
 		}
 	}
-	return false
+	return trimmed == "*" || strings.HasPrefix(trimmed, "* ")
 }
 
 func hasPositiveCompanion(diff model.Diff, pathMatch func(string) bool, terms []string, lineMatch func(model.File, model.Line, []string) bool) bool {
 	for _, file := range diff.Files {
 		if !pathMatch(file.Path) || file.Status == model.FileStatusDeleted {
 			continue
+		}
+		if isMetadataOnlyCompanionMove(file) {
+			return true
 		}
 		if fileHasPositiveChange(file, terms, lineMatch) {
 			return true
@@ -507,10 +510,26 @@ func hasPositiveCompanion(diff model.Diff, pathMatch func(string) bool, terms []
 	return false
 }
 
+func isMetadataOnlyCompanionMove(file model.File) bool {
+	if len(file.Hunks) != 0 {
+		return false
+	}
+
+	switch file.Status {
+	case model.FileStatusAdded, model.FileStatusRenamed, model.FileStatusCopied:
+		return true
+	default:
+		return false
+	}
+}
+
 func fileHasPositiveChange(file model.File, terms []string, lineMatch func(model.File, model.Line, []string) bool) bool {
 	for _, hunk := range file.Hunks {
 		for _, line := range hunk.Lines {
-			if !isChangedLine(line) || isCommentLike(line.Text) || strings.TrimSpace(line.Text) == "" {
+			if !isChangedLine(line) || strings.TrimSpace(line.Text) == "" {
+				continue
+			}
+			if !isDocCompanionPath(file.Path) && isCommentLike(line.Text) {
 				continue
 			}
 			if lineMatch(file, line, terms) {

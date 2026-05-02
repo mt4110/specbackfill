@@ -2,6 +2,7 @@ package diffparse
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/mt4110/specbackfill/internal/model"
@@ -83,5 +84,23 @@ func TestParseMixedNewlines(t *testing.T) {
 	}
 	if lines[2].Text != "  email String @unique" {
 		t.Fatalf("lines[2].Text = %q, want %q", lines[2].Text, "  email String @unique")
+	}
+}
+
+func TestParseLongLine(t *testing.T) {
+	t.Parallel()
+
+	longValue := strings.Repeat("x", 1024*1024+1)
+	input := []byte("--- a/generated/openapi/client.gen.ts\n+++ b/generated/openapi/client.gen.ts\n@@ -1 +1 @@\n-old\n+" + longValue + "\n")
+
+	diff, err := Parse(input)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if len(diff.Files) != 1 {
+		t.Fatalf("len(diff.Files) = %d, want 1", len(diff.Files))
+	}
+	if got := diff.Files[0].Hunks[0].Lines[1].Text; got != longValue {
+		t.Fatalf("added line length = %d, want %d", len(got), len(longValue))
 	}
 }

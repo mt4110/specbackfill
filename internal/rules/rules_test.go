@@ -128,6 +128,63 @@ func TestAPIPathMatchingIsCaseInsensitiveForPathSegments(t *testing.T) {
 	}
 }
 
+func TestMetadataOnlyCompanionMoveSuppressesFinding(t *testing.T) {
+	t.Parallel()
+
+	diff := model.Diff{
+		Files: []model.File{
+			{
+				Path:    "openapi.yaml",
+				OldPath: "openapi.yaml",
+				NewPath: "openapi.yaml",
+				Status:  model.FileStatusModified,
+				Hunks: []model.Hunk{{
+					Lines: []model.Line{{
+						Kind:    model.LineKindAdded,
+						Text:    "  /users:",
+						NewLine: 2,
+					}},
+				}},
+			},
+			{
+				Path:    "docs/api-v2.md",
+				OldPath: "docs/api.md",
+				NewPath: "docs/api-v2.md",
+				Status:  model.FileStatusRenamed,
+			},
+		},
+	}
+
+	if got := ruleIDs(Evaluate(diff, model.RepoProfile{})); len(got) != 0 {
+		t.Fatalf("ruleIDs = %v, want no findings", got)
+	}
+}
+
+func TestCommentLikeAllowsPointerDerefAndMarkdownCompanionLines(t *testing.T) {
+	t.Parallel()
+
+	if isCommentLike("*ptr = value") {
+		t.Fatalf("isCommentLike() = true for pointer dereference")
+	}
+	if !isCommentLike("* block comment continuation") {
+		t.Fatalf("isCommentLike() = false for block comment continuation")
+	}
+
+	file := model.File{
+		Path:   "docs/api.md",
+		Status: model.FileStatusModified,
+		Hunks: []model.Hunk{{
+			Lines: []model.Line{{
+				Kind: model.LineKindAdded,
+				Text: "* Document /users endpoint",
+			}},
+		}},
+	}
+	if !fileHasPositiveChange(file, []string{"users"}, companionTermsMatch) {
+		t.Fatalf("fileHasPositiveChange() = false, want markdown companion line to count")
+	}
+}
+
 func parseFixture(t *testing.T, name string) model.Diff {
 	t.Helper()
 
