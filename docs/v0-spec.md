@@ -7,7 +7,7 @@
 | Primary command | `specbackfill check` |
 | Detection core | rule-based |
 | Finding semantics | diff-local omission |
-| Repository note | This repository is currently phase-limited and documentation-centered. This document defines the intended v0 contract; it does not prove implementation completeness. |
+| Repository note | This repository is phase-limited. This document defines the intended v0 contract; it does not prove implementation completeness. |
 
 This document defines the normative v0 behavior for `specbackfill`.
 

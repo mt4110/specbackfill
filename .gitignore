@@ -1,0 +1,6 @@
+.DS_Store
+
+# Local agent state and internal planning scratch.
+.codex/
+.codex-*
+docs/prompt/

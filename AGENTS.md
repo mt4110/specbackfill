@@ -26,7 +26,24 @@ Use these names consistently:
 
 Do not introduce alternate product names in code, docs, examples, or tests unless explicitly requested.
 
-## 3. Non-negotiables
+## 3. Product posture
+
+`specbackfill` is not a general AI code reviewer.
+
+It is a small deterministic pre-review gate for structural omissions that should be visible from the diff alone. Its value is not breadth or intelligence. Its value is quiet, needle-threading precision:
+
+- concrete evidence
+- reproducible rule output
+- stable text and JSON reports
+- conservative wording that does not overclaim
+
+Think of it as a small blocker before human or AI review: if a diff changes a schema, API contract, config surface, public error/status contract, or generated spec/client artifact, `specbackfill` checks whether the expected companion artifacts moved in the same diff. It catches the loose threads between implementation changes and their companion artifacts.
+
+This pairs cleanly with `local-ai-review`: `specbackfill` should emit evidence-backed, rule-based diff-local omissions first; `local-ai-review` can then perform broader local LLM review on the PR diff. Do not merge these roles. `specbackfill` should provide deterministic structure before AI interpretation, not become another generic AI reviewer.
+
+If a proposed change makes the tool sound smarter than it is, depends on non-deterministic detection, claims repository-wide absence, or turns the project into a broad code review assistant, stop and keep the scope narrow.
+
+## 4. Non-negotiables
 
 - Detection must remain rule-based.
 - Findings must remain diff-local.
@@ -35,7 +52,32 @@ Do not introduce alternate product names in code, docs, examples, or tests unles
 - Rule evaluation must stand on diff input alone.
 - Do not make v0 depend on PR metadata, issue trackers, network calls, or external services.
 
-## 4. Phase discipline
+## 5. First PR readiness bar
+
+The first PR that claims working behavior should be a verified v0 MVP, not a complete future product.
+
+It should guarantee only the CLI contract and implemented rules included in that PR:
+
+- `specbackfill check` works for `--diff-file`, working tree diff, and `--base/--head`.
+- `--format text|json` output is stable and covered by tests or goldens.
+- `--fail-on error|warn|off` exit behavior is covered by tests.
+- Implemented rules are reproducible from diff input alone.
+- README files distinguish implemented rules from planned rules.
+- Local agent files such as `.codex/` and `.codex-*` are ignored and not committed.
+- Internal prompt/design scratch files are not mixed into the first PR unless explicitly requested and cleaned for canonical naming.
+
+For the current v0 MVP line, the implemented-rule bar is:
+
+- `DB001`
+- `DB002`
+- `CFG001`
+- `API001`
+- `ERR001`
+- `DOC001`
+
+Do not present `AUTH001` or `OPS001` as implemented until code and focused fixtures exist.
+
+## 6. Phase discipline
 
 Implement only the requested phase.
 
@@ -52,7 +94,7 @@ Keep changes small.
 Do not widen scope on your own.
 Do not add future-facing abstractions unless the current phase requires them.
 
-## 5. CLI contract
+## 7. CLI contract
 
 Unless a task explicitly changes it, preserve this contract:
 
@@ -70,7 +112,7 @@ Exit codes:
 
 Do not silently change flags, defaults, exit codes, or output semantics.
 
-## 6. Documentation policy
+## 8. Documentation policy
 
 - `README.md` must remain the Japanese primary entry point.
 - `README.en.md` must remain the English counterpart.
@@ -82,7 +124,7 @@ Do not silently change flags, defaults, exit codes, or output semantics.
 - Do not create a docs forest unless explicitly requested.
 - Do not claim features that are not implemented.
 
-## 7. Rule authoring discipline
+## 9. Rule authoring discipline
 
 When adding or changing a rule:
 
@@ -96,7 +138,7 @@ When adding or changing a rule:
 Prefer multiple signals such as path match, hunk keyword match, and companion absence within touched files.
 Do not emit broad findings from path names alone unless the phase explicitly allows it.
 
-## 8. Change discipline
+## 10. Change discipline
 
 - Prefer the simplest implementation that satisfies the current task.
 - Preserve existing behavior unless the task explicitly changes it.

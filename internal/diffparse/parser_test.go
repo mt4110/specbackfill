@@ -49,3 +49,28 @@ func TestParseMalformedDiff(t *testing.T) {
 		t.Fatalf("Parse() error = %v, want ErrMalformedDiff", err)
 	}
 }
+
+func TestParseMixedNewlines(t *testing.T) {
+	t.Parallel()
+
+	input := []byte("--- a/schema.prisma\r\n+++ b/schema.prisma\n@@ -1,3 +1,4 @@\r\n model User {\n   id Int @id\r\n+  email String @unique\r\n }\n")
+
+	diff, err := Parse(input)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if len(diff.Files) != 1 {
+		t.Fatalf("len(diff.Files) = %d, want 1", len(diff.Files))
+	}
+	if len(diff.Files[0].Hunks) != 1 {
+		t.Fatalf("len(diff.Files[0].Hunks) = %d, want 1", len(diff.Files[0].Hunks))
+	}
+
+	lines := diff.Files[0].Hunks[0].Lines
+	if len(lines) != 4 {
+		t.Fatalf("len(lines) = %d, want 4", len(lines))
+	}
+	if lines[2].Text != "  email String @unique" {
+		t.Fatalf("lines[2].Text = %q, want %q", lines[2].Text, "  email String @unique")
+	}
+}

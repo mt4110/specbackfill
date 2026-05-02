@@ -4,7 +4,7 @@
 
 specbackfill は、コード差分から **companion artifacts** の追従漏れを **diff-local omission** として扱う、rule-based な CLI です。見るのは repo 全体の不足ではなく、**この diff で一緒に動くべきものが同じ diff で動いているか** です。
 
-現状の repository では、その v0 契約と文書を先に固めています。
+現状の repository には、`specbackfill check` の v0 MVP と実装済みルールの検証 fixture が入っています。
 
 この README は日本語の主入口です。挙動の正本は [docs/v0-spec.md](./docs/v0-spec.md)、変更時の制約は [AGENTS.md](./AGENTS.md) にあります。
 
@@ -21,10 +21,11 @@ specbackfill は、コード差分から **companion artifacts** の追従漏れ
 - finding は常に **diff-local** です。repo 全体の欠落や不存在は主張しません。
 - すべての finding に **evidence** が必要です。証拠を示せない finding は出しません。
 - v0 は diff 入力だけで成立します。PR タイトルや issue 文脈には依存しません。
+- AI レビューの前段で、小さな構造的ほつれを決定論的にすくうための CLI です。
+
+`local-ai-review` のようなローカル LLM レビュー基盤と併用する場合、specbackfill は先に rule-based な omission finding を出し、AI 側はそれを説明・整理する役割に留めます。specbackfill 自体は AI finding を発明しません。
 
 ## v0 の契約
-
-現状の repo は phase-limited な docs/spec 中心の状態です。ここでは v0 で守る CLI 契約だけを要約します。
 
 ```bash
 specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
@@ -38,16 +39,27 @@ specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
 
 仕様の詳細と用語の正本は [docs/v0-spec.md](./docs/v0-spec.md) を見てください。
 
-## v0 のデフォルトルール
+## ローカル確認
+
+```bash
+go test ./...
+go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format text --fail-on off
+go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --format json --fail-on off
+```
+
+## 実装済みルール
 
 - `DB001`: Schema changed, no migration moved with the diff
 - `DB002`: Destructive storage change, no rollback/backfill note
 - `API001`: Public API surface changed, no contract test moved
 - `CFG001`: New config/env/flag introduced, no docs/default moved
-- `AUTH001`: Authn/Authz branch changed, no allow/deny tests moved
 - `ERR001`: Public error/status/code contract changed, no assertion test moved
-- `OPS001`: Worker/queue/retry behavior changed, no observability/runbook moved
 - `DOC001`: Generated spec changed, no hand-written explanation moved
+
+## v0 仕様上の未実装ルール
+
+- `AUTH001`: Authn/Authz branch changed, no allow/deny tests moved
+- `OPS001`: Worker/queue/retry behavior changed, no observability/runbook moved
 
 ## ステータス
 

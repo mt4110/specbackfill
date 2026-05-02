@@ -1,0 +1,14 @@
+--- a/openapi.yaml
++++ b/openapi.yaml
+@@ -1 +1,4 @@
+ paths:
++  /users:
++    get:
++      summary: list users
+--- a/internal/http/handler.go
++++ b/internal/http/handler.go
+@@ -1,3 +1,3 @@
+ func statusCode() int {
+-  return http.StatusBadRequest
++  return http.StatusUnprocessableEntity
+ }

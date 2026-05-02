@@ -173,6 +173,7 @@ func TestRunDiffFileCompanionHardening(t *testing.T) {
 		{name: "db002 unrelated companion does not suppress", file: "db002_unrelated_companion.diff", want: []string{"DB002"}},
 		{name: "db002 true companion still suppresses", file: "db002_companion.diff", want: []string{}},
 		{name: "cfg001 deleted docs do not suppress", file: "cfg001_deleted_docs.diff", want: []string{"CFG001"}},
+		{name: "cfg001 still emits when api001 is locally suppressed", file: "cfg001_positive_api001_suppressed.diff", want: []string{"CFG001"}},
 		{name: "cfg001 removed unrelated docs do not suppress", file: "cfg001_removed_unrelated_docs.diff", want: []string{"CFG001"}},
 		{name: "cfg001 unrelated docs do not suppress", file: "cfg001_unrelated_docs.diff", want: []string{"CFG001"}},
 		{name: "cfg001 true companion still suppresses", file: "cfg001_companion.diff", want: []string{}},

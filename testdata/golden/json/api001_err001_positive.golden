@@ -1,0 +1,75 @@
+{
+  "version": "v0",
+  "summary": {
+    "error": 0,
+    "warn": 2,
+    "info": 0
+  },
+  "repo_profile": {
+    "go": false,
+    "node": false,
+    "prisma": false,
+    "openapi": false,
+    "proto": false,
+    "migrations": false
+  },
+  "findings": [
+    {
+      "rule_id": "API001",
+      "severity": "warn",
+      "confidence": "high",
+      "title": "Public API changed, but no matching contract-test/docs companion moved with this diff",
+      "why": "An explicit API spec file moved in the diff, but no matching contract-test/docs companion evidence moved with it.",
+      "evidence": [
+        {
+          "file": "openapi.yaml",
+          "line": 2,
+          "kind": "added",
+          "excerpt": "/users:"
+        },
+        {
+          "file": "openapi.yaml",
+          "line": 3,
+          "kind": "added",
+          "excerpt": "get:"
+        },
+        {
+          "file": "openapi.yaml",
+          "line": 4,
+          "kind": "added",
+          "excerpt": "summary: list users"
+        }
+      ],
+      "expected_companions": [
+        "contract test",
+        "API docs",
+        "compatibility or deprecation note"
+      ]
+    },
+    {
+      "rule_id": "ERR001",
+      "severity": "warn",
+      "confidence": "high",
+      "title": "Public error/status/code contract changed, but no matching assertion-test/docs companion moved with this diff",
+      "why": "An explicit public error/status/code contract line moved in the diff, but no matching assertion-test/docs companion evidence moved with it.",
+      "evidence": [
+        {
+          "file": "internal/http/handler.go",
+          "line": 2,
+          "kind": "removed",
+          "excerpt": "return http.StatusBadRequest"
+        },
+        {
+          "file": "internal/http/handler.go",
+          "line": 2,
+          "kind": "added",
+          "excerpt": "return http.StatusUnprocessableEntity"
+        }
+      ],
+      "expected_companions": [
+        "assertion test",
+        "API or client note"
+      ]
+    }
+  ]
+}

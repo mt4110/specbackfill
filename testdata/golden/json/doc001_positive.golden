@@ -1,0 +1,37 @@
+{
+  "version": "v0",
+  "summary": {
+    "error": 0,
+    "warn": 1,
+    "info": 0
+  },
+  "repo_profile": {
+    "go": false,
+    "node": false,
+    "prisma": false,
+    "openapi": false,
+    "proto": false,
+    "migrations": false
+  },
+  "findings": [
+    {
+      "rule_id": "DOC001",
+      "severity": "warn",
+      "confidence": "high",
+      "title": "Generated spec/client changed, but no matching human-facing explanation moved with this diff",
+      "why": "A generated API/spec client artifact moved in the diff, but no matching human-facing explanation evidence moved with it.",
+      "evidence": [
+        {
+          "file": "generated/openapi/client.gen.ts",
+          "line": 2,
+          "kind": "added",
+          "excerpt": "export type UserList = User[]"
+        }
+      ],
+      "expected_companions": [
+        "human docs",
+        "upgrade note"
+      ]
+    }
+  ]
+}

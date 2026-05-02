@@ -1,0 +1,22 @@
+specbackfill check
+changed files: 2
+findings: error=0 warn=2 info=0
+[warn] API001 Public API changed, but no matching contract-test/docs companion moved with this diff
+  why: An explicit API spec file moved in the diff, but no matching contract-test/docs companion evidence moved with it.
+  evidence:
+    - openapi.yaml:+ /users:
+    - openapi.yaml:+ get:
+    - openapi.yaml:+ summary: list users
+  expected companions:
+    - contract test
+    - API docs
+    - compatibility or deprecation note
+
+[warn] ERR001 Public error/status/code contract changed, but no matching assertion-test/docs companion moved with this diff
+  why: An explicit public error/status/code contract line moved in the diff, but no matching assertion-test/docs companion evidence moved with it.
+  evidence:
+    - internal/http/handler.go:- return http.StatusBadRequest
+    - internal/http/handler.go:+ return http.StatusUnprocessableEntity
+  expected companions:
+    - assertion test
+    - API or client note

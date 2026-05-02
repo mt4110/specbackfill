@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/mt4110/specbackfill/internal/model"
@@ -17,7 +18,7 @@ var (
 )
 
 func Parse(data []byte) (model.Diff, error) {
-	normalized := bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
+	normalized := normalizeNewlines(data)
 	if len(bytes.TrimSpace(normalized)) == 0 {
 		return model.Diff{}, nil
 	}
@@ -137,29 +138,53 @@ func Parse(data []byte) (model.Diff, error) {
 		case strings.HasPrefix(line, "rename from "):
 			currentFile = ensureFile(currentFile)
 			currentFile.Status = model.FileStatusRenamed
-			currentFile.OldPath = parseMetadataPath(strings.TrimPrefix(line, "rename from "))
+			pathText, err := parseMetadataPath(strings.TrimPrefix(line, "rename from "))
+			if err != nil {
+				return model.Diff{}, err
+			}
+			currentFile.OldPath = pathText
 		case strings.HasPrefix(line, "rename to "):
 			currentFile = ensureFile(currentFile)
 			currentFile.Status = model.FileStatusRenamed
-			currentFile.NewPath = parseMetadataPath(strings.TrimPrefix(line, "rename to "))
+			pathText, err := parseMetadataPath(strings.TrimPrefix(line, "rename to "))
+			if err != nil {
+				return model.Diff{}, err
+			}
+			currentFile.NewPath = pathText
 		case strings.HasPrefix(line, "copy from "):
 			currentFile = ensureFile(currentFile)
 			currentFile.Status = model.FileStatusCopied
-			currentFile.OldPath = parseMetadataPath(strings.TrimPrefix(line, "copy from "))
+			pathText, err := parseMetadataPath(strings.TrimPrefix(line, "copy from "))
+			if err != nil {
+				return model.Diff{}, err
+			}
+			currentFile.OldPath = pathText
 		case strings.HasPrefix(line, "copy to "):
 			currentFile = ensureFile(currentFile)
 			currentFile.Status = model.FileStatusCopied
-			currentFile.NewPath = parseMetadataPath(strings.TrimPrefix(line, "copy to "))
+			pathText, err := parseMetadataPath(strings.TrimPrefix(line, "copy to "))
+			if err != nil {
+				return model.Diff{}, err
+			}
+			currentFile.NewPath = pathText
 		case strings.HasPrefix(line, "--- "):
 			if currentStarted {
 				flushFile()
 			}
 			currentFile = ensureFile(currentFile)
-			currentFile.OldPath = parsePatchPath(strings.TrimPrefix(line, "--- "))
+			pathText, err := parsePatchPath(strings.TrimPrefix(line, "--- "))
+			if err != nil {
+				return model.Diff{}, err
+			}
+			currentFile.OldPath = pathText
 			currentStarted = true
 		case strings.HasPrefix(line, "+++ "):
 			currentFile = ensureFile(currentFile)
-			currentFile.NewPath = parsePatchPath(strings.TrimPrefix(line, "+++ "))
+			pathText, err := parsePatchPath(strings.TrimPrefix(line, "+++ "))
+			if err != nil {
+				return model.Diff{}, err
+			}
+			currentFile.NewPath = pathText
 			currentStarted = true
 		case strings.HasPrefix(line, "@@ "):
 			if currentFile == nil {
@@ -200,35 +225,123 @@ func ensureFile(file *model.File) *model.File {
 
 func parseGitHeader(line string) (string, string, error) {
 	rest := strings.TrimPrefix(line, "diff --git ")
+
+	if strings.Contains(rest, `"`) {
+		oldToken, remaining, err := consumeGitHeaderPath(rest)
+		if err != nil {
+			return "", "", err
+		}
+		newToken, remaining, err := consumeGitHeaderPath(remaining)
+		if err != nil {
+			return "", "", err
+		}
+		if strings.TrimSpace(remaining) != "" {
+			return "", "", fmt.Errorf("%w: invalid git header %q", ErrMalformedDiff, line)
+		}
+
+		oldPath, err := parseDiffHeaderPath(oldToken, "a/")
+		if err != nil {
+			return "", "", err
+		}
+		newPath, err := parseDiffHeaderPath(newToken, "b/")
+		if err != nil {
+			return "", "", err
+		}
+		return oldPath, newPath, nil
+	}
+
 	separator := strings.Index(rest, " b/")
 	if !strings.HasPrefix(rest, "a/") || separator == -1 {
 		return "", "", fmt.Errorf("%w: invalid git header %q", ErrMalformedDiff, line)
 	}
 
-	oldPath := parsePatchPath(rest[:separator])
-	newPath := parsePatchPath(rest[separator+1:])
+	oldPath, err := parseDiffHeaderPath(rest[:separator], "a/")
+	if err != nil {
+		return "", "", err
+	}
+	newPath, err := parseDiffHeaderPath(rest[separator+1:], "b/")
+	if err != nil {
+		return "", "", err
+	}
 	return oldPath, newPath, nil
 }
 
-func parsePatchPath(raw string) string {
-	pathText := strings.TrimSpace(raw)
-	if index := strings.IndexByte(pathText, '\t'); index >= 0 {
-		pathText = pathText[:index]
+func parseDiffHeaderPath(raw, prefix string) (string, error) {
+	pathText, err := decodePathText(raw)
+	if err != nil {
+		return "", err
 	}
+	if !strings.HasPrefix(pathText, prefix) {
+		return "", fmt.Errorf("%w: invalid git header path %q", ErrMalformedDiff, raw)
+	}
+	return model.NormalizePath(strings.TrimPrefix(pathText, prefix)), nil
+}
 
-	pathText = model.NormalizePath(pathText)
+func parsePatchPath(raw string) (string, error) {
+	pathText, err := decodePathText(raw)
+	if err != nil {
+		return "", err
+	}
 	if strings.HasPrefix(pathText, "a/") || strings.HasPrefix(pathText, "b/") {
 		pathText = pathText[2:]
 	}
-	return model.NormalizePath(pathText)
+	return model.NormalizePath(pathText), nil
 }
 
-func parseMetadataPath(raw string) string {
+func parseMetadataPath(raw string) (string, error) {
+	return decodePathText(raw)
+}
+
+func decodePathText(raw string) (string, error) {
 	pathText := strings.TrimSpace(raw)
 	if index := strings.IndexByte(pathText, '\t'); index >= 0 {
 		pathText = pathText[:index]
 	}
-	return model.NormalizePath(pathText)
+	if strings.HasPrefix(pathText, `"`) {
+		unquoted, err := strconv.Unquote(pathText)
+		if err != nil {
+			return "", fmt.Errorf("%w: invalid quoted path %q", ErrMalformedDiff, raw)
+		}
+		pathText = unquoted
+	}
+	return model.NormalizePath(pathText), nil
+}
+
+func consumeGitHeaderPath(input string) (string, string, error) {
+	trimmed := strings.TrimLeft(input, " ")
+	if trimmed == "" {
+		return "", "", fmt.Errorf("%w: invalid git header %q", ErrMalformedDiff, input)
+	}
+
+	if trimmed[0] != '"' {
+		index := strings.IndexByte(trimmed, ' ')
+		if index == -1 {
+			return trimmed, "", nil
+		}
+		return trimmed[:index], strings.TrimLeft(trimmed[index+1:], " "), nil
+	}
+
+	escaped := false
+	for index := 1; index < len(trimmed); index++ {
+		switch trimmed[index] {
+		case '\\':
+			escaped = !escaped
+		case '"':
+			if !escaped {
+				return trimmed[:index+1], strings.TrimLeft(trimmed[index+1:], " "), nil
+			}
+			escaped = false
+		default:
+			escaped = false
+		}
+	}
+
+	return "", "", fmt.Errorf("%w: invalid quoted git header path %q", ErrMalformedDiff, input)
+}
+
+func normalizeNewlines(data []byte) []byte {
+	normalized := bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
+	return bytes.ReplaceAll(normalized, []byte("\r"), []byte("\n"))
 }
 
 func parseHunkHeader(line string) (model.Hunk, error) {

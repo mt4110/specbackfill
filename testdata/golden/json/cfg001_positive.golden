@@ -1,0 +1,38 @@
+{
+  "version": "v0",
+  "summary": {
+    "error": 0,
+    "warn": 1,
+    "info": 0
+  },
+  "repo_profile": {
+    "go": false,
+    "node": false,
+    "prisma": false,
+    "openapi": false,
+    "proto": false,
+    "migrations": false
+  },
+  "findings": [
+    {
+      "rule_id": "CFG001",
+      "severity": "warn",
+      "confidence": "high",
+      "title": "New config detected, but no matching docs/default companion moved with this diff",
+      "why": "A new config/env/flag line moved in the diff, but no matching docs/default companion evidence moved with it.",
+      "evidence": [
+        {
+          "file": "internal/config/load.go",
+          "line": 2,
+          "kind": "added",
+          "excerpt": "token := os.Getenv(\"NEW_API_TOKEN\")"
+        }
+      ],
+      "expected_companions": [
+        "docs",
+        "default value handling",
+        "upgrade note"
+      ]
+    }
+  ]
+}

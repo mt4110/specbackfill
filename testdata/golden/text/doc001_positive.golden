@@ -1,0 +1,10 @@
+specbackfill check
+changed files: 1
+findings: error=0 warn=1 info=0
+[warn] DOC001 Generated spec/client changed, but no matching human-facing explanation moved with this diff
+  why: A generated API/spec client artifact moved in the diff, but no matching human-facing explanation evidence moved with it.
+  evidence:
+    - generated/openapi/client.gen.ts:+ export type UserList = User[]
+  expected companions:
+    - human docs
+    - upgrade note

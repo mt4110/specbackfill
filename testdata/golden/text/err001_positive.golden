@@ -1,0 +1,11 @@
+specbackfill check
+changed files: 1
+findings: error=0 warn=1 info=0
+[warn] ERR001 Public error/status/code contract changed, but no matching assertion-test/docs companion moved with this diff
+  why: An explicit public error/status/code contract line moved in the diff, but no matching assertion-test/docs companion evidence moved with it.
+  evidence:
+    - internal/http/handler.go:- return http.StatusBadRequest
+    - internal/http/handler.go:+ return http.StatusUnprocessableEntity
+  expected companions:
+    - assertion test
+    - API or client note
