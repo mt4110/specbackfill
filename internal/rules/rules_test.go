@@ -50,6 +50,7 @@ func TestEvaluateFixtures(t *testing.T) {
 		{name: "auth001 positive", file: "auth001_positive.diff", want: []string{"AUTH001"}},
 		{name: "auth001 middleware positive", file: "auth001_middleware_positive.diff", want: []string{"AUTH001"}},
 		{name: "auth001 allow deny companion satisfied", file: "auth001_companion.diff", want: nil},
+		{name: "auth001 allow deny companion empty context satisfied", file: "auth001_companion_empty_context.diff", want: nil},
 		{name: "auth001 allow deny companion without specific terms satisfied", file: "auth001_companion_no_specific_terms.diff", want: nil},
 		{name: "auth001 security note companion satisfied", file: "auth001_security_note_companion.diff", want: nil},
 		{name: "auth001 deleted companion", file: "auth001_deleted_companion.diff", want: []string{"AUTH001"}},

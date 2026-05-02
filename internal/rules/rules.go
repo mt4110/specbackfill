@@ -669,6 +669,9 @@ func matchesAUTH001CompanionContext(file model.File, line model.Line, context au
 	if companionTermsMatch(file, line, context.terms) {
 		return true
 	}
+	if len(context.terms) == 0 && len(context.fallbackPathTerms) == 0 {
+		return true
+	}
 
 	lowerPath := strings.ToLower(file.Path)
 	lowerText := strings.ToLower(line.Text)
