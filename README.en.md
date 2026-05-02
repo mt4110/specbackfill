@@ -53,12 +53,12 @@ go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_posit
 - `DB002`: Destructive storage change, no rollback/backfill note
 - `API001`: Public API surface changed, no contract test moved
 - `CFG001`: New config/env/flag introduced, no docs/default moved
+- `AUTH001`: Authn/Authz branch changed, no allow/deny tests moved
 - `ERR001`: Public error/status/code contract changed, no assertion test moved
 - `DOC001`: Generated spec changed, no hand-written explanation moved
 
 ## Specified But Not Yet Implemented
 
-- `AUTH001`: Authn/Authz branch changed, no allow/deny tests moved
 - `OPS001`: Worker/queue/retry behavior changed, no observability/runbook moved
 
 ## Status

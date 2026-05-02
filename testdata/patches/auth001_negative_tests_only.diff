@@ -1,0 +1,6 @@
+--- a/internal/auth/permissions_test.go
++++ b/internal/auth/permissions_test.go
+@@ -1,2 +1,3 @@
+ func TestCanManageAccount(t *testing.T) {
++  t.Run("denies viewer role", func(t *testing.T) {})
+ }
