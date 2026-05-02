@@ -56,6 +56,7 @@ func TestEvaluateFixtures(t *testing.T) {
 		{name: "auth001 removed companion", file: "auth001_removed_companion.diff", want: []string{"AUTH001"}},
 		{name: "auth001 unrelated companion", file: "auth001_unrelated_companion.diff", want: []string{"AUTH001"}},
 		{name: "auth001 security code unrelated companion", file: "auth001_security_code_unrelated.diff", want: []string{"AUTH001"}},
+		{name: "auth001 unrelated 200 with deny still warns", file: "auth001_unrelated_200_with_deny.diff", want: []string{"AUTH001"}},
 		{name: "auth001 examples only negative", file: "auth001_negative_examples_only.diff", want: nil},
 		{name: "auth001 non-auth path negative", file: "auth001_negative_non_auth_path.diff", want: nil},
 		{name: "auth001 generated only negative", file: "auth001_negative_generated_only.diff", want: nil},
@@ -239,6 +240,9 @@ func TestAUTH001AllowDenyMarkersAreTokenBased(t *testing.T) {
 	}
 	if !isAUTH001AllowLine(`assert.Equal(t, http.StatusOK, status)`) {
 		t.Fatalf("isAUTH001AllowLine() = false, want true for StatusOK marker")
+	}
+	if isAUTH001AllowLine(`expectedRetryBudget := 200`) {
+		t.Fatalf("isAUTH001AllowLine() = true, want false for bare 200 marker")
 	}
 	if isAUTH001AllowLine(`t.Run("disallows viewer", func(t *testing.T) {})`) {
 		t.Fatalf("isAUTH001AllowLine() = true, want false for disallows marker")

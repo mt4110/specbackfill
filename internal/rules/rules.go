@@ -669,9 +669,6 @@ func matchesAUTH001CompanionContext(file model.File, line model.Line, context au
 	if companionTermsMatch(file, line, context.terms) {
 		return true
 	}
-	if len(context.terms) != 0 {
-		return false
-	}
 
 	lowerPath := strings.ToLower(file.Path)
 	lowerText := strings.ToLower(line.Text)
@@ -752,7 +749,6 @@ func hasAUTH001MarkerToken(token string, markers map[string]struct{}) bool {
 }
 
 var auth001AllowMarkers = map[string]struct{}{
-	"200":       {},
 	"allow":     {},
 	"allowed":   {},
 	"allows":    {},
