@@ -74,14 +74,17 @@ func TestEvaluateFixtures(t *testing.T) {
 		{name: "err001 message only negative", file: "err001_negative_message_only.diff", want: nil},
 		{name: "err001 comment only negative", file: "err001_negative_comment_only.diff", want: nil},
 		{name: "ops001 positive", file: "ops001_positive.diff", want: []string{"OPS001"}},
+		{name: "ops001 ops path positive", file: "ops001_ops_path_positive.diff", want: []string{"OPS001"}},
 		{name: "ops001 topic positive", file: "ops001_topic_positive.diff", want: []string{"OPS001"}},
 		{name: "ops001 cron positive", file: "ops001_cron_positive.diff", want: []string{"OPS001"}},
+		{name: "ops001 cron named fields positive", file: "ops001_cron_named_fields_positive.diff", want: []string{"OPS001"}},
 		{name: "ops001 consumer behavior positive", file: "ops001_consumer_behavior_positive.diff", want: []string{"OPS001"}},
 		{name: "ops001 companion satisfied", file: "ops001_companion.diff", want: nil},
 		{name: "ops001 observability companion satisfied", file: "ops001_observability_companion.diff", want: nil},
 		{name: "ops001 deleted companion", file: "ops001_deleted_companion.diff", want: []string{"OPS001"}},
 		{name: "ops001 removed companion", file: "ops001_removed_companion.diff", want: []string{"OPS001"}},
 		{name: "ops001 unrelated companion", file: "ops001_unrelated_companion.diff", want: []string{"OPS001"}},
+		{name: "ops001 unrelated observability companion", file: "ops001_unrelated_observability_companion.diff", want: []string{"OPS001"}},
 		{name: "ops001 non ops path negative", file: "ops001_negative_non_ops_path.diff", want: nil},
 		{name: "ops001 generated only negative", file: "ops001_negative_generated_only.diff", want: nil},
 		{name: "ops001 docs only negative", file: "ops001_negative_docs_only.diff", want: nil},
@@ -277,13 +280,16 @@ func TestAUTH001AllowDenyMarkersAreTokenBased(t *testing.T) {
 	}
 }
 
-func TestOPS001LineMatchingAvoidsPackageAckNoise(t *testing.T) {
+func TestOPS001LineMatchingAvoidsPackageDeclarationFalsePositives(t *testing.T) {
 	t.Parallel()
 
 	if matchesOPS001Line("internal/workers/consumer.go", "package workers") {
 		t.Fatalf("matchesOPS001Line() = true, want false for package declaration")
 	}
-	if !matchesOPS001Line("internal/workers/consumer.go", "message.Ack(ctx)") {
+	if matchesOPS001Line("internal/consumers/worker.go", "package consumers") {
+		t.Fatalf("matchesOPS001Line() = true, want false for package declaration containing trigger term")
+	}
+	if !matchesOPS001Line("internal/consumers/worker.go", "message.Ack(ctx)") {
 		t.Fatalf("matchesOPS001Line() = false, want true for explicit Ack call")
 	}
 }

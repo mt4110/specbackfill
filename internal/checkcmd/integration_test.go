@@ -195,6 +195,7 @@ func TestRunDiffFileCompanionHardening(t *testing.T) {
 		{name: "ops001 deleted companion does not suppress", file: "ops001_deleted_companion.diff", want: []string{"OPS001"}},
 		{name: "ops001 removed companion does not suppress", file: "ops001_removed_companion.diff", want: []string{"OPS001"}},
 		{name: "ops001 unrelated companion does not suppress", file: "ops001_unrelated_companion.diff", want: []string{"OPS001"}},
+		{name: "ops001 unrelated observability companion does not suppress", file: "ops001_unrelated_observability_companion.diff", want: []string{"OPS001"}},
 		{name: "ops001 true companion still suppresses", file: "ops001_companion.diff", want: []string{}},
 		{name: "ops001 observability companion still suppresses", file: "ops001_observability_companion.diff", want: []string{}},
 		{name: "doc001 deleted docs do not suppress", file: "doc001_deleted_docs.diff", want: []string{"DOC001"}},

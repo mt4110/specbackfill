@@ -14,7 +14,7 @@ var alnumTokenRE = regexp.MustCompile(`[a-z0-9]+`)
 var httpStatusRE = regexp.MustCompile(`\bhttp\.Status[A-Z][A-Za-z0-9_]+\b`)
 var grpcCodeRE = regexp.MustCompile(`\bcodes\.[A-Z][A-Za-z0-9_]+\b`)
 var durationLiteralRE = regexp.MustCompile(`\b\d+\s*(ms|s|m|h)\b`)
-var cronExpressionRE = regexp.MustCompile(`["'](?:@(?:annually|yearly|monthly|weekly|daily|hourly|reboot)|(?:[0-9*/?,lw#-]+\s+){4,6}[0-9*/?,lw#-]+)["']`)
+var cronExpressionRE = regexp.MustCompile(`(?i)["'](?:@(?:annually|yearly|monthly|weekly|daily|hourly|reboot)|(?:[a-z0-9*/?,lw#-]+\s+){4,6}[a-z0-9*/?,lw#-]+)["']`)
 
 func Evaluate(diff model.Diff, _ model.RepoProfile) []model.Finding {
 	findings := make([]model.Finding, 0, 8)
@@ -974,6 +974,10 @@ func matchesOPS001Line(filePath, text string) bool {
 	}
 
 	lower := strings.ToLower(trimmed)
+	if isOPS001DeclarationLine(lower) {
+		return false
+	}
+
 	for _, trigger := range []string{
 		"queue",
 		"topic",
@@ -1025,6 +1029,10 @@ func matchesOPS001Line(filePath, text string) bool {
 	}
 
 	return isOPS001TimingPath(filePath) && (strings.Contains(lower, "time.") || durationLiteralRE.MatchString(lower))
+}
+
+func isOPS001DeclarationLine(lower string) bool {
+	return strings.HasPrefix(lower, "package ")
 }
 
 func isOPS001CronPath(filePath string) bool {
@@ -1182,6 +1190,8 @@ var ignoredOPS001SearchTerms = map[string]struct{}{
 	"messaging":     {},
 	"ms":            {},
 	"nack":          {},
+	"operations":    {},
+	"ops":           {},
 	"poll":          {},
 	"pubsub":        {},
 	"publish":       {},
@@ -1232,8 +1242,6 @@ func isOPS001StrongCompanionPath(filePath string) bool {
 		"monitors",
 		"observability",
 		"oncall",
-		"ops",
-		"operations",
 		"playbook",
 		"playbooks",
 		"prometheus",
@@ -1267,7 +1275,7 @@ func fileHasOPS001Companion(file model.File, context ops001CompanionContext) boo
 			if !matchesOPS001CompanionContext(lowerPath, strings.ToLower(line.Text), context) {
 				continue
 			}
-			if isOPS001StrongCompanionPath(file.Path) || isOPS001CompanionLine(line.Text) {
+			if isOPS001CompanionLine(line.Text) {
 				return true
 			}
 		}

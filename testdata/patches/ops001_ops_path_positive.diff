@@ -1,0 +1,13 @@
+--- a/internal/ops/workers/billing_consumer.go
++++ b/internal/ops/workers/billing_consumer.go
+@@ -1,8 +1,8 @@
+ package workers
+ const billingTopic = "billing.events"
+ func NewBillingConsumer() Consumer {
+   return Consumer{
+-    Topic: billingTopic,
+-    RetryBackoff: 5 * time.Second,
++    Topic: "billing.v2.events",
++    RetryBackoff: 30 * time.Second,
+   }
+ }
