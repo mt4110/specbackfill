@@ -1,0 +1,8 @@
+--- a/internal/messaging/topics.go
++++ b/internal/messaging/topics.go
+@@ -1,4 +1,4 @@
+ package messaging
+ const (
+-  BillingTopic = "billing.events"
++  BillingTopic = "billing.v2.events"
+ )

@@ -1,0 +1,6 @@
+--- a/docs/runbooks/billing-worker.md
++++ b/docs/runbooks/billing-worker.md
+@@ -1,2 +1,3 @@
+ # Billing worker
+ Existing notes.
++Retry timeout is now 30 seconds.

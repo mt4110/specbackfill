@@ -1,0 +1,8 @@
+--- a/internal/workers/generated/billing_consumer.gen.go
++++ b/internal/workers/generated/billing_consumer.gen.go
+@@ -1,4 +1,4 @@
+ package generated
+ const (
+-  BillingTopic = "billing.events"
++  BillingTopic = "billing.v2.events"
+ )

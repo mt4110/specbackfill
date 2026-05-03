@@ -73,6 +73,26 @@ func TestEvaluateFixtures(t *testing.T) {
 		{name: "err001 unrelated companion", file: "err001_unrelated_companion.diff", want: []string{"ERR001"}},
 		{name: "err001 message only negative", file: "err001_negative_message_only.diff", want: nil},
 		{name: "err001 comment only negative", file: "err001_negative_comment_only.diff", want: nil},
+		{name: "ops001 positive", file: "ops001_positive.diff", want: []string{"OPS001"}},
+		{name: "ops001 ops path positive", file: "ops001_ops_path_positive.diff", want: []string{"OPS001"}},
+		{name: "ops001 topic positive", file: "ops001_topic_positive.diff", want: []string{"OPS001"}},
+		{name: "ops001 topic basename positive", file: "ops001_topic_basename_positive.diff", want: []string{"OPS001"}},
+		{name: "ops001 cron positive", file: "ops001_cron_positive.diff", want: []string{"OPS001"}},
+		{name: "ops001 cron named fields positive", file: "ops001_cron_named_fields_positive.diff", want: []string{"OPS001"}},
+		{name: "ops001 cron midnight positive", file: "ops001_cron_midnight_positive.diff", want: []string{"OPS001"}},
+		{name: "ops001 consumer behavior positive", file: "ops001_consumer_behavior_positive.diff", want: []string{"OPS001"}},
+		{name: "ops001 companion satisfied", file: "ops001_companion.diff", want: nil},
+		{name: "ops001 fallback companion satisfied", file: "ops001_fallback_companion.diff", want: nil},
+		{name: "ops001 observability companion satisfied", file: "ops001_observability_companion.diff", want: nil},
+		{name: "ops001 deleted companion", file: "ops001_deleted_companion.diff", want: []string{"OPS001"}},
+		{name: "ops001 removed companion", file: "ops001_removed_companion.diff", want: []string{"OPS001"}},
+		{name: "ops001 unrelated companion", file: "ops001_unrelated_companion.diff", want: []string{"OPS001"}},
+		{name: "ops001 unrelated observability companion", file: "ops001_unrelated_observability_companion.diff", want: []string{"OPS001"}},
+		{name: "ops001 non ops path negative", file: "ops001_negative_non_ops_path.diff", want: nil},
+		{name: "ops001 generated only negative", file: "ops001_negative_generated_only.diff", want: nil},
+		{name: "ops001 docs only negative", file: "ops001_negative_docs_only.diff", want: nil},
+		{name: "ops001 tests only negative", file: "ops001_negative_tests_only.diff", want: nil},
+		{name: "ops001 examples only negative", file: "ops001_negative_examples_only.diff", want: nil},
 		{name: "api001 generated only noise guard", file: "doc001_positive.diff", want: []string{"DOC001"}},
 		{name: "doc001 positive", file: "doc001_positive.diff", want: []string{"DOC001"}},
 		{name: "doc001 companion satisfied", file: "doc001_companion.diff", want: nil},
@@ -109,6 +129,7 @@ func TestFindingsIncludeRequiredFields(t *testing.T) {
 		"api001_positive.diff",
 		"auth001_positive.diff",
 		"err001_positive.diff",
+		"ops001_positive.diff",
 		"doc001_positive.diff",
 	}
 
@@ -259,6 +280,35 @@ func TestAUTH001AllowDenyMarkersAreTokenBased(t *testing.T) {
 	}
 	if !isAUTH001DenyLine(`assert.Equal(t, http.StatusForbidden, status)`) {
 		t.Fatalf("isAUTH001DenyLine() = false, want true for StatusForbidden marker")
+	}
+}
+
+func TestOPS001LineMatchingAvoidsPackageDeclarationFalsePositives(t *testing.T) {
+	t.Parallel()
+
+	if matchesOPS001Line("internal/workers/consumer.go", "package retry") {
+		t.Fatalf("matchesOPS001Line() = true, want false for package declaration")
+	}
+	if matchesOPS001Line("internal/consumers/worker.go", "package consumers") {
+		t.Fatalf("matchesOPS001Line() = true, want false for package declaration containing trigger term")
+	}
+	if matchesOPS001Line("internal/consumers/worker.go", `import "example.com/project/retry"`) {
+		t.Fatalf("matchesOPS001Line() = true, want false for import declaration containing trigger term")
+	}
+	if matchesOPS001Line("internal/consumers/worker.go", `"example.com/project/retry"`) {
+		t.Fatalf("matchesOPS001Line() = true, want false for import path containing trigger term")
+	}
+	if !matchesOPS001Line("internal/consumers/worker.go", "message.Ack(ctx)") {
+		t.Fatalf("matchesOPS001Line() = false, want true for explicit Ack call")
+	}
+}
+
+func TestOPS001CompanionContextNormalizesCompoundTerms(t *testing.T) {
+	t.Parallel()
+
+	context := ops001CompanionContext{terms: []string{"retrybackoff"}}
+	if !matchesOPS001CompanionContext("docs/runbooks/billing-worker.md", "rollback path for retry backoff changes", context) {
+		t.Fatalf("matchesOPS001CompanionContext() = false, want true for separated retry backoff wording")
 	}
 }
 

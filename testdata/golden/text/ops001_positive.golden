@@ -1,0 +1,13 @@
+specbackfill check
+changed files: 1
+findings: error=0 warn=1 info=0
+[warn] OPS001 Worker/queue/retry behavior changed, but no matching observability/runbook companion moved with this diff
+  why: Operational worker/queue/retry lines moved in the diff, but no matching observability, runbook, or rollback guidance evidence moved with them.
+  evidence:
+    - internal/workers/billing_consumer.go:- Topic: billingTopic,
+    - internal/workers/billing_consumer.go:- RetryBackoff: 5 * time.Second,
+    - internal/workers/billing_consumer.go:+ Topic: "billing.v2.events",
+  expected companions:
+    - observability note
+    - runbook update
+    - rollback path

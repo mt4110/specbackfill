@@ -68,8 +68,8 @@ v0 is intentionally narrow and optimized for backend/service repositories.
 | Rule DSLs | out of scope |
 | Plugin systems | out of scope |
 | Web services or dashboards | out of scope |
-| Databases | out of scope |
-| Background workers | out of scope |
+| Database connections or runtime inspection | out of scope |
+| Background worker hosting or runtime inspection | out of scope |
 | SARIF output | out of scope |
 
 v0 MUST remain usable with diff input alone.

@@ -138,6 +138,13 @@ func TestRunFailOnModesWithFindings(t *testing.T) {
 		{name: "err001 warn threshold", fixture: "err001_positive.diff", failOn: "warn", wantCode: 1},
 		{name: "err001 removed-only companion clears warn threshold", fixture: "err001_removed_companion.diff", failOn: "warn", wantCode: 0},
 		{name: "err001 paraphrased companion clears warn threshold", fixture: "err001_paraphrased_companion.diff", failOn: "warn", wantCode: 0},
+		{name: "ops001 error threshold", fixture: "ops001_positive.diff", failOn: "error", wantCode: 0},
+		{name: "ops001 warn threshold", fixture: "ops001_positive.diff", failOn: "warn", wantCode: 1},
+		{name: "ops001 companion clears warn threshold", fixture: "ops001_companion.diff", failOn: "warn", wantCode: 0},
+		{name: "ops001 observability companion clears warn threshold", fixture: "ops001_observability_companion.diff", failOn: "warn", wantCode: 0},
+		{name: "ops001 deleted companion still warns", fixture: "ops001_deleted_companion.diff", failOn: "warn", wantCode: 1},
+		{name: "ops001 removed companion still warns", fixture: "ops001_removed_companion.diff", failOn: "warn", wantCode: 1},
+		{name: "ops001 unrelated companion still warns", fixture: "ops001_unrelated_companion.diff", failOn: "warn", wantCode: 1},
 		{name: "doc001 warn threshold", fixture: "doc001_positive.diff", failOn: "warn", wantCode: 1},
 		{name: "doc001 unrelated docs still warn", fixture: "doc001_unrelated_docs.diff", failOn: "warn", wantCode: 1},
 	}
@@ -185,6 +192,12 @@ func TestRunDiffFileCompanionHardening(t *testing.T) {
 		{name: "err001 deleted companion does not suppress", file: "err001_deleted_companion.diff", want: []string{"ERR001"}},
 		{name: "err001 unrelated companion does not suppress", file: "err001_unrelated_companion.diff", want: []string{"ERR001"}},
 		{name: "err001 true companion still suppresses", file: "err001_companion.diff", want: []string{}},
+		{name: "ops001 deleted companion does not suppress", file: "ops001_deleted_companion.diff", want: []string{"OPS001"}},
+		{name: "ops001 removed companion does not suppress", file: "ops001_removed_companion.diff", want: []string{"OPS001"}},
+		{name: "ops001 unrelated companion does not suppress", file: "ops001_unrelated_companion.diff", want: []string{"OPS001"}},
+		{name: "ops001 unrelated observability companion does not suppress", file: "ops001_unrelated_observability_companion.diff", want: []string{"OPS001"}},
+		{name: "ops001 true companion still suppresses", file: "ops001_companion.diff", want: []string{}},
+		{name: "ops001 observability companion still suppresses", file: "ops001_observability_companion.diff", want: []string{}},
 		{name: "doc001 deleted docs do not suppress", file: "doc001_deleted_docs.diff", want: []string{"DOC001"}},
 		{name: "doc001 unrelated docs do not suppress", file: "doc001_unrelated_docs.diff", want: []string{"DOC001"}},
 		{name: "doc001 true companion still suppresses", file: "doc001_companion.diff", want: []string{}},
@@ -274,6 +287,16 @@ func TestInputSourceEquivalenceByRule(t *testing.T) {
 			},
 			change: func(t *testing.T, repo string) {
 				writeRepoFile(t, filepath.Join(repo, "generated", "openapi", "client.gen.ts"), "export type User = { id: string }\nexport type UserList = User[]\n")
+			},
+		},
+		{
+			name:     "ops001",
+			wantRule: "OPS001",
+			setup: func(t *testing.T, repo string) {
+				writeRepoFile(t, filepath.Join(repo, "internal", "workers", "billing_consumer.go"), "package workers\n\nfunc NewBillingConsumer() Consumer {\n  return Consumer{Topic: \"billing.events\", RetryBackoff: 5 * time.Second}\n}\n")
+			},
+			change: func(t *testing.T, repo string) {
+				writeRepoFile(t, filepath.Join(repo, "internal", "workers", "billing_consumer.go"), "package workers\n\nfunc NewBillingConsumer() Consumer {\n  return Consumer{Topic: \"billing.v2.events\", RetryBackoff: 30 * time.Second}\n}\n")
 			},
 		},
 	}
