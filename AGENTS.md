@@ -74,9 +74,8 @@ For the current v0 MVP line, the implemented-rule bar is:
 - `API001`
 - `AUTH001`
 - `ERR001`
+- `OPS001`
 - `DOC001`
-
-Do not present `OPS001` as implemented until code and focused fixtures exist.
 
 ## 6. Phase discipline
 

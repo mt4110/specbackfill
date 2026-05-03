@@ -1,0 +1,50 @@
+{
+  "version": "v0",
+  "summary": {
+    "error": 0,
+    "warn": 1,
+    "info": 0
+  },
+  "repo_profile": {
+    "go": false,
+    "node": false,
+    "prisma": false,
+    "openapi": false,
+    "proto": false,
+    "migrations": false
+  },
+  "findings": [
+    {
+      "rule_id": "OPS001",
+      "severity": "warn",
+      "confidence": "high",
+      "title": "Worker/queue/retry behavior changed, but no matching observability/runbook companion moved with this diff",
+      "why": "Operational worker/queue/retry lines moved in the diff, but no matching observability, runbook, or rollback guidance evidence moved with them.",
+      "evidence": [
+        {
+          "file": "internal/workers/billing_consumer.go",
+          "line": 5,
+          "kind": "removed",
+          "excerpt": "Topic: billingTopic,"
+        },
+        {
+          "file": "internal/workers/billing_consumer.go",
+          "line": 6,
+          "kind": "removed",
+          "excerpt": "RetryBackoff: 5 * time.Second,"
+        },
+        {
+          "file": "internal/workers/billing_consumer.go",
+          "line": 5,
+          "kind": "added",
+          "excerpt": "Topic: \"billing.v2.events\","
+        }
+      ],
+      "expected_companions": [
+        "observability note",
+        "runbook update",
+        "rollback path"
+      ]
+    }
+  ]
+}

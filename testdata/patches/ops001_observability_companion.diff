@@ -1,0 +1,20 @@
+--- a/internal/workers/billing_consumer.go
++++ b/internal/workers/billing_consumer.go
+@@ -1,8 +1,8 @@
+ package workers
+ const billingTopic = "billing.events"
+ func NewBillingConsumer() Consumer {
+   return Consumer{
+-    Topic: billingTopic,
+-    RetryBackoff: 5 * time.Second,
++    Topic: "billing.v2.events",
++    RetryBackoff: 30 * time.Second,
+   }
+ }
+--- a/monitoring/alerts/billing-worker.yaml
++++ b/monitoring/alerts/billing-worker.yaml
+@@ -1,2 +1,4 @@
+ groups:
+   - name: billing-worker
++    rules:
++      - alert: BillingWorkerRetryBackoffErrors

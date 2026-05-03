@@ -1,0 +1,9 @@
+--- a/internal/http/client.go
++++ b/internal/http/client.go
+@@ -1,5 +1,5 @@
+ func newClient() *http.Client {
+   return &http.Client{
+-    Timeout: 5 * time.Second,
++    Timeout: 30 * time.Second,
+   }
+ }

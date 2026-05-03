@@ -10,11 +10,14 @@ import (
 
 var prismaFieldRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*\s+[A-Za-z_][A-Za-z0-9_\[\]?]*`)
 var termTokenRE = regexp.MustCompile(`[A-Za-z0-9_./-]+`)
+var alnumTokenRE = regexp.MustCompile(`[a-z0-9]+`)
 var httpStatusRE = regexp.MustCompile(`\bhttp\.Status[A-Z][A-Za-z0-9_]+\b`)
 var grpcCodeRE = regexp.MustCompile(`\bcodes\.[A-Z][A-Za-z0-9_]+\b`)
+var durationLiteralRE = regexp.MustCompile(`\b\d+\s*(ms|s|m|h)\b`)
+var cronExpressionRE = regexp.MustCompile(`["'](?:@(?:annually|yearly|monthly|weekly|daily|hourly|reboot)|(?:[0-9*/?,lw#-]+\s+){4,6}[0-9*/?,lw#-]+)["']`)
 
 func Evaluate(diff model.Diff, _ model.RepoProfile) []model.Finding {
-	findings := make([]model.Finding, 0, 7)
+	findings := make([]model.Finding, 0, 8)
 
 	if finding, ok := evaluateDB001(diff); ok {
 		findings = append(findings, finding)
@@ -32,6 +35,9 @@ func Evaluate(diff model.Diff, _ model.RepoProfile) []model.Finding {
 		findings = append(findings, finding)
 	}
 	if finding, ok := evaluateERR001(diff); ok {
+		findings = append(findings, finding)
+	}
+	if finding, ok := evaluateOPS001(diff); ok {
 		findings = append(findings, finding)
 	}
 	if finding, ok := evaluateDOC001(diff); ok {
@@ -206,6 +212,32 @@ func evaluateERR001(diff model.Diff) (model.Finding, bool) {
 		ExpectedCompanions: []string{
 			"assertion test",
 			"API or client note",
+		},
+	}, true
+}
+
+func evaluateOPS001(diff model.Diff) (model.Finding, bool) {
+	evidence := collectEvidence(diff, 3, func(file model.File, line model.Line) bool {
+		return isOPS001TriggerPath(file.Path) && isChangedLine(line) && matchesOPS001Line(file.Path, line.Text)
+	})
+	if len(evidence) == 0 {
+		return model.Finding{}, false
+	}
+	if hasOPS001Companion(diff, buildOPS001CompanionContext(evidence)) {
+		return model.Finding{}, false
+	}
+
+	return model.Finding{
+		RuleID:     "OPS001",
+		Severity:   model.SeverityWarn,
+		Confidence: "high",
+		Title:      "Worker/queue/retry behavior changed, but no matching observability/runbook companion moved with this diff",
+		Why:        "Operational worker/queue/retry lines moved in the diff, but no matching observability, runbook, or rollback guidance evidence moved with them.",
+		Evidence:   evidence,
+		ExpectedCompanions: []string{
+			"observability note",
+			"runbook update",
+			"rollback path",
 		},
 	}, true
 }
@@ -879,6 +911,427 @@ func matchesERR001Line(text string) bool {
 
 func isERR001CompanionPath(filePath string) bool {
 	return isDocCompanionPath(filePath) || isConventionalTestPath(filePath)
+}
+
+func isOPS001TriggerPath(filePath string) bool {
+	if isGeneratedPath(filePath) || isDocCompanionPath(filePath) || isConventionalTestPath(filePath) || isExamplePath(filePath) {
+		return false
+	}
+
+	lower := strings.ToLower(filePath)
+	for _, segment := range []string{
+		"worker",
+		"workers",
+		"queue",
+		"queues",
+		"topic",
+		"topics",
+		"messaging",
+		"pubsub",
+		"kafka",
+		"sqs",
+		"sns",
+		"rabbitmq",
+		"consumer",
+		"consumers",
+		"subscriber",
+		"subscribers",
+		"publisher",
+		"publishers",
+		"job",
+		"jobs",
+		"task",
+		"tasks",
+		"cron",
+		"scheduler",
+		"schedulers",
+		"retry",
+		"retries",
+		"backoff",
+	} {
+		if hasPathSegment(lower, segment) {
+			return true
+		}
+	}
+
+	base := strings.ToLower(path.Base(filePath))
+	for _, hint := range []string{"worker", "queue", "consumer", "subscriber", "publisher", "job", "cron", "schedule", "retry", "backoff"} {
+		if strings.Contains(base, hint) {
+			return true
+		}
+	}
+	return false
+}
+
+func matchesOPS001Line(filePath, text string) bool {
+	if isCommentLike(text) {
+		return false
+	}
+
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return false
+	}
+
+	lower := strings.ToLower(trimmed)
+	for _, trigger := range []string{
+		"queue",
+		"topic",
+		"consumer",
+		"consume",
+		"subscriber",
+		"subscribe",
+		"publisher",
+		"publish",
+		".ack(",
+		".nack(",
+		"deadletter",
+		"dead_letter",
+		"dead-letter",
+		"dlq",
+		"retry",
+		"retries",
+		"retryable",
+		"maxattempt",
+		"max_attempt",
+		"maxinflight",
+		"max_in_flight",
+		"max-in-flight",
+		"prefetch",
+		"concurrency",
+		"parallelism",
+		"batchsize",
+		"batch_size",
+		"batch-size",
+		"timeout",
+		"deadline",
+		"withtimeout",
+		"cron",
+		"schedule",
+		"scheduler",
+		"@every",
+		"backoff",
+		"jitter",
+		"interval",
+		"poll",
+	} {
+		if strings.Contains(lower, trigger) {
+			return true
+		}
+	}
+
+	if isOPS001CronPath(filePath) && cronExpressionRE.MatchString(lower) {
+		return true
+	}
+
+	return isOPS001TimingPath(filePath) && (strings.Contains(lower, "time.") || durationLiteralRE.MatchString(lower))
+}
+
+func isOPS001CronPath(filePath string) bool {
+	lower := strings.ToLower(filePath)
+	if hasPathSegment(lower, "cron") || hasPathSegment(lower, "scheduler") || hasPathSegment(lower, "schedulers") {
+		return true
+	}
+
+	base := strings.ToLower(path.Base(filePath))
+	return strings.Contains(base, "cron") || strings.Contains(base, "schedule")
+}
+
+func isOPS001TimingPath(filePath string) bool {
+	lower := strings.ToLower(filePath)
+	for _, segment := range []string{"worker", "workers", "queue", "queues", "consumer", "consumers", "retry", "retries", "backoff", "cron", "scheduler", "schedulers"} {
+		if hasPathSegment(lower, segment) {
+			return true
+		}
+	}
+	return false
+}
+
+type ops001CompanionContext struct {
+	terms             []string
+	fallbackPathTerms []string
+}
+
+func hasOPS001Companion(diff model.Diff, context ops001CompanionContext) bool {
+	for _, file := range diff.Files {
+		if file.Status == model.FileStatusDeleted || !isOPS001CompanionPath(file.Path) {
+			continue
+		}
+		if isMetadataOnlyCompanionMove(file) && isOPS001CompanionPathRelated(file.Path, context) {
+			return true
+		}
+		if fileHasOPS001Companion(file, context) {
+			return true
+		}
+	}
+	return false
+}
+
+func buildOPS001CompanionContext(evidence []model.Evidence) ops001CompanionContext {
+	return ops001CompanionContext{
+		terms:             extractOPS001SearchTerms(evidence),
+		fallbackPathTerms: extractOPS001FallbackPathTerms(evidence),
+	}
+}
+
+func extractOPS001SearchTerms(evidence []model.Evidence) []string {
+	seen := map[string]struct{}{}
+	terms := make([]string, 0, 8)
+
+	for _, evidenceItem := range evidence {
+		for _, source := range []string{evidenceItem.File, evidenceItem.Excerpt} {
+			for _, token := range termTokenRE.FindAllString(source, -1) {
+				addOPS001SearchTerms(seen, &terms, token)
+			}
+		}
+	}
+
+	return terms
+}
+
+func addOPS001SearchTerms(seen map[string]struct{}, terms *[]string, token string) {
+	cleaned := strings.ToLower(strings.Trim(token, "\"'`:,()[]{}<>"))
+	if cleaned == "" {
+		return
+	}
+
+	addOPS001SearchTerm(seen, terms, cleaned)
+	for _, part := range strings.FieldsFunc(cleaned, func(r rune) bool {
+		return r == '/' || r == '_' || r == '-' || r == '.'
+	}) {
+		addOPS001SearchTerm(seen, terms, part)
+	}
+	if strings.HasSuffix(cleaned, "s") && !strings.HasSuffix(cleaned, "ss") {
+		addOPS001SearchTerm(seen, terms, strings.TrimSuffix(cleaned, "s"))
+	}
+}
+
+func addOPS001SearchTerm(seen map[string]struct{}, terms *[]string, term string) {
+	if len(term) < 3 {
+		return
+	}
+	if _, blocked := ignoredOPS001SearchTerms[term]; blocked {
+		return
+	}
+	if _, exists := seen[term]; exists {
+		return
+	}
+
+	seen[term] = struct{}{}
+	*terms = append(*terms, term)
+}
+
+func extractOPS001FallbackPathTerms(evidence []model.Evidence) []string {
+	seen := map[string]struct{}{}
+	terms := make([]string, 0, len(evidence))
+
+	for _, evidenceItem := range evidence {
+		base := strings.ToLower(path.Base(evidenceItem.File))
+		if ext := path.Ext(base); ext != "" {
+			base = strings.TrimSuffix(base, ext)
+		}
+		addOPS001FallbackPathTerm(seen, &terms, base)
+		for _, segment := range strings.Split(strings.ToLower(path.Dir(evidenceItem.File)), "/") {
+			addOPS001FallbackPathTerm(seen, &terms, segment)
+		}
+	}
+
+	return terms
+}
+
+func addOPS001FallbackPathTerm(seen map[string]struct{}, terms *[]string, term string) {
+	if len(term) < 3 {
+		return
+	}
+	if _, blocked := ignoredOPS001SearchTerms[term]; blocked {
+		return
+	}
+	if _, exists := seen[term]; exists {
+		return
+	}
+
+	seen[term] = struct{}{}
+	*terms = append(*terms, term)
+}
+
+var ignoredOPS001SearchTerms = map[string]struct{}{
+	"ack":           {},
+	"backoff":       {},
+	"consume":       {},
+	"consumer":      {},
+	"consumers":     {},
+	"cron":          {},
+	"deadline":      {},
+	"event":         {},
+	"events":        {},
+	"go":            {},
+	"internal":      {},
+	"kafka":         {},
+	"interval":      {},
+	"job":           {},
+	"jobs":          {},
+	"jitter":        {},
+	"max":           {},
+	"maxattempt":    {},
+	"maxattempts":   {},
+	"max_attempt":   {},
+	"maxinflight":   {},
+	"max_in_flight": {},
+	"message":       {},
+	"messages":      {},
+	"messaging":     {},
+	"ms":            {},
+	"nack":          {},
+	"poll":          {},
+	"pubsub":        {},
+	"publish":       {},
+	"publisher":     {},
+	"publishers":    {},
+	"queue":         {},
+	"queues":        {},
+	"rabbitmq":      {},
+	"retries":       {},
+	"retry":         {},
+	"retryable":     {},
+	"schedule":      {},
+	"scheduler":     {},
+	"schedulers":    {},
+	"second":        {},
+	"seconds":       {},
+	"service":       {},
+	"sns":           {},
+	"sqs":           {},
+	"subscribe":     {},
+	"subscriber":    {},
+	"subscribers":   {},
+	"task":          {},
+	"tasks":         {},
+	"time":          {},
+	"timeout":       {},
+	"topics":        {},
+	"topic":         {},
+	"ts":            {},
+	"worker":        {},
+	"workers":       {},
+}
+
+func isOPS001CompanionPath(filePath string) bool {
+	if isGeneratedPath(filePath) || isExamplePath(filePath) || isConventionalTestPath(filePath) {
+		return false
+	}
+	return isDocCompanionPath(filePath) || isOPS001StrongCompanionPath(filePath)
+}
+
+func isOPS001StrongCompanionPath(filePath string) bool {
+	lower := strings.ToLower(filePath)
+	for _, segment := range []string{
+		"alerts",
+		"dashboards",
+		"grafana",
+		"monitoring",
+		"monitors",
+		"observability",
+		"oncall",
+		"ops",
+		"operations",
+		"playbook",
+		"playbooks",
+		"prometheus",
+		"rollback",
+		"rollbacks",
+		"runbook",
+		"runbooks",
+		"slo",
+	} {
+		if hasPathSegment(lower, segment) {
+			return true
+		}
+	}
+	return false
+}
+
+func isOPS001CompanionPathRelated(filePath string, context ops001CompanionContext) bool {
+	return matchesOPS001CompanionContext(strings.ToLower(filePath), "", context)
+}
+
+func fileHasOPS001Companion(file model.File, context ops001CompanionContext) bool {
+	lowerPath := strings.ToLower(file.Path)
+	for _, hunk := range file.Hunks {
+		for _, line := range hunk.Lines {
+			if line.Kind != model.LineKindAdded || strings.TrimSpace(line.Text) == "" {
+				continue
+			}
+			if !isDocCompanionPath(file.Path) && isCommentLike(line.Text) {
+				continue
+			}
+			if !matchesOPS001CompanionContext(lowerPath, strings.ToLower(line.Text), context) {
+				continue
+			}
+			if isOPS001StrongCompanionPath(file.Path) || isOPS001CompanionLine(line.Text) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func matchesOPS001CompanionContext(lowerPath, lowerText string, context ops001CompanionContext) bool {
+	if len(context.terms) == 0 && len(context.fallbackPathTerms) == 0 {
+		return true
+	}
+
+	normalizedPath := normalizeOPS001ContextText(lowerPath)
+	normalizedText := normalizeOPS001ContextText(lowerText)
+
+	for _, term := range context.terms {
+		if containsOPS001ContextTerm(lowerPath, normalizedPath, term) || containsOPS001ContextTerm(lowerText, normalizedText, term) {
+			return true
+		}
+	}
+	for _, term := range context.fallbackPathTerms {
+		if containsOPS001ContextTerm(lowerPath, normalizedPath, term) || containsOPS001ContextTerm(lowerText, normalizedText, term) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsOPS001ContextTerm(raw, normalized, term string) bool {
+	if strings.Contains(raw, term) {
+		return true
+	}
+
+	normalizedTerm := normalizeOPS001ContextText(term)
+	return normalizedTerm != "" && strings.Contains(normalized, normalizedTerm)
+}
+
+func normalizeOPS001ContextText(text string) string {
+	return strings.Join(alnumTokenRE.FindAllString(strings.ToLower(text), -1), "")
+}
+
+func isOPS001CompanionLine(text string) bool {
+	lower := strings.ToLower(text)
+	for _, marker := range []string{
+		"alert",
+		"dashboard",
+		"metric",
+		"monitor",
+		"observability",
+		"on-call",
+		"oncall",
+		"operator",
+		"pager",
+		"playbook",
+		"rollback",
+		"roll back",
+		"runbook",
+		"trace",
+	} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func isDOC001Path(filePath string) bool {

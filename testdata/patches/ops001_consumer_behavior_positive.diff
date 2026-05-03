@@ -1,0 +1,9 @@
+--- a/internal/consumers/email_consumer.go
++++ b/internal/consumers/email_consumer.go
+@@ -1,5 +1,5 @@
+ func NewEmailConsumer() Consumer {
+   return Consumer{
+-    MaxInFlight: 5,
++    MaxInFlight: 20,
+   }
+ }
