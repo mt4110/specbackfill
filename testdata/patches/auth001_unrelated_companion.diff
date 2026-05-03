@@ -1,0 +1,15 @@
+--- a/internal/auth/permissions.go
++++ b/internal/auth/permissions.go
+@@ -1,6 +1,6 @@
+ func CanManageAccount(user User, account Account) bool {
+   if user.ID == account.OwnerID {
+     return true
+   }
+-  return user.Role == "admin"
++  return user.Role == "admin" || user.Scope == "accounts:manage"
+ }
+--- a/docs/security.md
++++ b/docs/security.md
+@@ -1 +1,2 @@
+ # Security
++Security note: rotate audit log wording during the next release.

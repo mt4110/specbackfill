@@ -1,0 +1,17 @@
+--- a/internal/auth/permissions.go
++++ b/internal/auth/permissions.go
+@@ -1,6 +1,6 @@
+ func CanManageAccount(user User, account Account) bool {
+   if user.ID == account.OwnerID {
+     return true
+   }
+-  return user.Role == "admin"
++  return user.Role == "admin" || user.Scope == "accounts:manage"
+ }
+--- a/internal/auth/permissions_test.go
++++ /dev/null
+@@ -1,4 +0,0 @@
+-func TestCanManageAccount(t *testing.T) {
+-  t.Run("allows accounts manage scope", func(t *testing.T) {})
+-  t.Run("denies accounts manage scope for viewer role", func(t *testing.T) {})
+-}

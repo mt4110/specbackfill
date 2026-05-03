@@ -14,7 +14,7 @@ var httpStatusRE = regexp.MustCompile(`\bhttp\.Status[A-Z][A-Za-z0-9_]+\b`)
 var grpcCodeRE = regexp.MustCompile(`\bcodes\.[A-Z][A-Za-z0-9_]+\b`)
 
 func Evaluate(diff model.Diff, _ model.RepoProfile) []model.Finding {
-	findings := make([]model.Finding, 0, 6)
+	findings := make([]model.Finding, 0, 7)
 
 	if finding, ok := evaluateDB001(diff); ok {
 		findings = append(findings, finding)
@@ -26,6 +26,9 @@ func Evaluate(diff model.Diff, _ model.RepoProfile) []model.Finding {
 		findings = append(findings, finding)
 	}
 	if finding, ok := evaluateAPI001(diff); ok {
+		findings = append(findings, finding)
+	}
+	if finding, ok := evaluateAUTH001(diff); ok {
 		findings = append(findings, finding)
 	}
 	if finding, ok := evaluateERR001(diff); ok {
@@ -149,6 +152,32 @@ func evaluateAPI001(diff model.Diff) (model.Finding, bool) {
 			"contract test",
 			"API docs",
 			"compatibility or deprecation note",
+		},
+	}, true
+}
+
+func evaluateAUTH001(diff model.Diff) (model.Finding, bool) {
+	evidence := collectEvidence(diff, 3, func(file model.File, line model.Line) bool {
+		return isAUTH001TriggerPath(file.Path) && isChangedLine(line) && matchesAUTH001Line(line.Text)
+	})
+	if len(evidence) == 0 {
+		return model.Finding{}, false
+	}
+	if hasAUTH001Companion(diff, buildAUTH001CompanionContext(evidence)) {
+		return model.Finding{}, false
+	}
+
+	return model.Finding{
+		RuleID:     "AUTH001",
+		Severity:   model.SeverityWarn,
+		Confidence: "high",
+		Title:      "Authn/Authz branch changed, but no matching allow/deny or security-sensitive note companion moved with this diff",
+		Why:        "Authorization-sensitive lines moved in the diff, but no matching allow/deny test or security-sensitive note evidence moved with them.",
+		Evidence:   evidence,
+		ExpectedCompanions: []string{
+			"allow test",
+			"deny test",
+			"security-sensitive note",
 		},
 	}, true
 }
@@ -407,6 +436,438 @@ func isAPICompanionPath(filePath string) bool {
 	return strings.Contains(lower, "/tests/contract/") || strings.Contains(lower, "/tests/integration/") || strings.Contains(lower, "/test/api/")
 }
 
+func isAUTH001TriggerPath(filePath string) bool {
+	if isGeneratedPath(filePath) || isDocCompanionPath(filePath) || isConventionalTestPath(filePath) || isExamplePath(filePath) {
+		return false
+	}
+
+	lower := strings.ToLower(filePath)
+	for _, segment := range []string{
+		"auth",
+		"authn",
+		"authz",
+		"authorization",
+		"authentication",
+		"permission",
+		"permissions",
+		"rbac",
+		"acl",
+		"middleware",
+		"middlewares",
+		"guard",
+		"guards",
+		"policy",
+		"policies",
+	} {
+		if hasPathSegment(lower, segment) {
+			return true
+		}
+	}
+
+	base := strings.ToLower(path.Base(filePath))
+	for _, hint := range []string{"auth", "permission", "middleware", "guard", "policy"} {
+		if strings.Contains(base, hint) {
+			return true
+		}
+	}
+	return false
+}
+
+func matchesAUTH001Line(text string) bool {
+	if isCommentLike(text) {
+		return false
+	}
+
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return false
+	}
+
+	lower := strings.ToLower(trimmed)
+	for _, trigger := range []string{
+		"authorize",
+		"authorization",
+		"authz",
+		"authn",
+		"permission",
+		"role",
+		"scope",
+		"forbidden",
+		"unauthorized",
+		"unauthenticated",
+		"middleware",
+		"guard",
+		"policy",
+	} {
+		if strings.Contains(lower, trigger) {
+			return true
+		}
+	}
+	return false
+}
+
+type auth001CompanionContext struct {
+	terms             []string
+	fallbackPathTerms []string
+	evidencePaths     []string
+}
+
+func hasAUTH001Companion(diff model.Diff, context auth001CompanionContext) bool {
+	hasAllow := false
+	hasDeny := false
+
+	for _, file := range diff.Files {
+		if file.Status == model.FileStatusDeleted {
+			continue
+		}
+		if isAUTH001MetadataCompanionMove(file, context) {
+			return true
+		}
+		if isAUTH001SecurityNotePath(file.Path) && fileHasAUTH001SecurityNote(file, context) {
+			return true
+		}
+		if !isAUTH001TestPath(file.Path) {
+			continue
+		}
+		for _, hunk := range file.Hunks {
+			for _, line := range hunk.Lines {
+				if line.Kind != model.LineKindAdded || strings.TrimSpace(line.Text) == "" || isCommentLike(line.Text) {
+					continue
+				}
+				if !matchesAUTH001CompanionContext(file, line, context) {
+					continue
+				}
+				if isAUTH001AllowLine(line.Text) {
+					hasAllow = true
+				}
+				if isAUTH001DenyLine(line.Text) {
+					hasDeny = true
+				}
+				if hasAllow && hasDeny {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+func buildAUTH001CompanionContext(evidence []model.Evidence) auth001CompanionContext {
+	return auth001CompanionContext{
+		terms:             extractAUTH001SearchTerms(evidence),
+		fallbackPathTerms: extractAUTH001FallbackPathTerms(evidence),
+		evidencePaths:     extractAUTH001EvidencePaths(evidence),
+	}
+}
+
+func extractAUTH001SearchTerms(evidence []model.Evidence) []string {
+	seen := map[string]struct{}{}
+	terms := make([]string, 0, 8)
+
+	for _, evidenceItem := range evidence {
+		for _, token := range termTokenRE.FindAllString(evidenceItem.Excerpt, -1) {
+			addAUTH001SearchTerms(seen, &terms, token)
+		}
+	}
+
+	return terms
+}
+
+func addAUTH001SearchTerms(seen map[string]struct{}, terms *[]string, token string) {
+	cleaned := strings.ToLower(strings.Trim(token, "\"'`:,()[]{}<>"))
+	if cleaned == "" {
+		return
+	}
+
+	addAUTH001SearchTerm(seen, terms, cleaned)
+	for _, part := range strings.FieldsFunc(cleaned, func(r rune) bool {
+		return r == '/' || r == '_' || r == '-' || r == '.'
+	}) {
+		addAUTH001SearchTerm(seen, terms, part)
+	}
+	if strings.HasSuffix(cleaned, "s") && !strings.HasSuffix(cleaned, "ss") {
+		addAUTH001SearchTerm(seen, terms, strings.TrimSuffix(cleaned, "s"))
+	}
+}
+
+func addAUTH001SearchTerm(seen map[string]struct{}, terms *[]string, term string) {
+	if _, blocked := ignoredAUTH001SearchTerms[term]; blocked {
+		return
+	}
+	addSearchTerm(seen, terms, term)
+}
+
+func extractAUTH001FallbackPathTerms(evidence []model.Evidence) []string {
+	seen := map[string]struct{}{}
+	terms := make([]string, 0, len(evidence))
+
+	for _, evidenceItem := range evidence {
+		base := strings.ToLower(path.Base(evidenceItem.File))
+		if ext := path.Ext(base); ext != "" {
+			base = strings.TrimSuffix(base, ext)
+		}
+		addAUTH001FallbackPathTerm(seen, &terms, base)
+		for _, segment := range strings.Split(strings.ToLower(path.Dir(evidenceItem.File)), "/") {
+			addAUTH001FallbackPathTerm(seen, &terms, segment)
+		}
+	}
+
+	return terms
+}
+
+func extractAUTH001EvidencePaths(evidence []model.Evidence) []string {
+	seen := map[string]struct{}{}
+	paths := make([]string, 0, len(evidence))
+
+	for _, evidenceItem := range evidence {
+		normalized := strings.ToLower(evidenceItem.File)
+		if normalized == "" {
+			continue
+		}
+		if _, exists := seen[normalized]; exists {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		paths = append(paths, normalized)
+	}
+
+	return paths
+}
+
+func addAUTH001FallbackPathTerm(seen map[string]struct{}, terms *[]string, term string) {
+	if len(term) < 3 {
+		return
+	}
+	if _, blocked := ignoredAUTH001FallbackPathTerms[term]; blocked {
+		return
+	}
+	if _, exists := seen[term]; exists {
+		return
+	}
+
+	seen[term] = struct{}{}
+	*terms = append(*terms, term)
+}
+
+var ignoredAUTH001SearchTerms = map[string]struct{}{
+	"auth":           {},
+	"authentication": {},
+	"authorization":  {},
+	"authorize":      {},
+	"authn":          {},
+	"authz":          {},
+	"forbidden":      {},
+	"guard":          {},
+	"middleware":     {},
+	"permission":     {},
+	"permissions":    {},
+	"policy":         {},
+	"role":           {},
+	"roles":          {},
+	"scope":          {},
+	"scopes":         {},
+	"unauthorized":   {},
+	"user":           {},
+	"users":          {},
+}
+
+var ignoredAUTH001FallbackPathTerms = map[string]struct{}{
+	"acl":            {},
+	"auth":           {},
+	"authentication": {},
+	"authorization":  {},
+	"authn":          {},
+	"authz":          {},
+	"internal":       {},
+	"middleware":     {},
+	"middlewares":    {},
+	"permission":     {},
+	"permissions":    {},
+	"policy":         {},
+	"policies":       {},
+	"rbac":           {},
+}
+
+func matchesAUTH001CompanionContext(file model.File, line model.Line, context auth001CompanionContext) bool {
+	if companionTermsMatch(file, line, context.terms) {
+		return true
+	}
+	if isAUTH001EmptyContext(context) {
+		if isAUTH001SecurityNotePath(file.Path) {
+			return true
+		}
+		return isAUTH001RelatedTestCompanionPath(strings.ToLower(file.Path), context)
+	}
+
+	lowerPath := strings.ToLower(file.Path)
+	lowerText := strings.ToLower(line.Text)
+	for _, term := range context.fallbackPathTerms {
+		if strings.Contains(lowerPath, term) || strings.Contains(lowerText, term) {
+			return true
+		}
+	}
+	return false
+}
+
+func isAUTH001EmptyContext(context auth001CompanionContext) bool {
+	return len(context.terms) == 0 && len(context.fallbackPathTerms) == 0
+}
+
+func isAUTH001MetadataCompanionMove(file model.File, context auth001CompanionContext) bool {
+	if !isMetadataOnlyCompanionMove(file) {
+		return false
+	}
+	if isAUTH001SecurityNotePath(file.Path) {
+		return true
+	}
+	return isAUTH001RelatedTestCompanionPath(strings.ToLower(file.Path), context)
+}
+
+func isAUTH001RelatedTestCompanionPath(filePath string, context auth001CompanionContext) bool {
+	if !isAUTH001TestPath(filePath) {
+		return false
+	}
+
+	for _, term := range context.terms {
+		if strings.Contains(filePath, term) {
+			return true
+		}
+	}
+	for _, term := range context.fallbackPathTerms {
+		if strings.Contains(filePath, term) {
+			return true
+		}
+	}
+
+	companionDir := path.Dir(filePath)
+	companionBase := strings.TrimSuffix(path.Base(filePath), path.Ext(filePath))
+	companionBase = strings.TrimSuffix(companionBase, "_test")
+
+	for _, evidencePath := range context.evidencePaths {
+		evidenceDir := path.Dir(evidencePath)
+		evidenceBase := strings.TrimSuffix(path.Base(evidencePath), path.Ext(evidencePath))
+		if companionDir == evidenceDir || companionBase == evidenceBase {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isAUTH001TestPath(filePath string) bool {
+	return isConventionalTestPath(filePath)
+}
+
+func isAUTH001SecurityNotePath(filePath string) bool {
+	if isGeneratedPath(filePath) || isExamplePath(filePath) || isConventionalTestPath(filePath) {
+		return false
+	}
+	if isDocCompanionPath(filePath) {
+		return true
+	}
+
+	base := strings.ToLower(path.Base(filePath))
+	return base == "security.md"
+}
+
+func fileHasAUTH001SecurityNote(file model.File, context auth001CompanionContext) bool {
+	for _, hunk := range file.Hunks {
+		for _, line := range hunk.Lines {
+			if line.Kind != model.LineKindAdded || strings.TrimSpace(line.Text) == "" {
+				continue
+			}
+			if !matchesAUTH001CompanionContext(file, line, context) {
+				continue
+			}
+			if isAUTH001SecurityNoteLine(line.Text) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isAUTH001AllowLine(text string) bool {
+	return strings.Contains(strings.ToLower(text), "status ok") || hasAUTH001LineMarker(text, auth001AllowMarkers)
+}
+
+func isAUTH001DenyLine(text string) bool {
+	return hasAUTH001LineMarker(text, auth001DenyMarkers)
+}
+
+func hasAUTH001LineMarker(text string, markers map[string]struct{}) bool {
+	lower := strings.ToLower(text)
+	for _, token := range termTokenRE.FindAllString(lower, -1) {
+		cleaned := strings.Trim(token, "\"'`:,()[]{}<>")
+		if hasAUTH001MarkerToken(cleaned, markers) {
+			return true
+		}
+		for _, part := range strings.FieldsFunc(cleaned, func(r rune) bool {
+			return r == '/' || r == '_' || r == '-' || r == '.'
+		}) {
+			if hasAUTH001MarkerToken(part, markers) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func hasAUTH001MarkerToken(token string, markers map[string]struct{}) bool {
+	if token == "" {
+		return false
+	}
+	_, ok := markers[token]
+	return ok
+}
+
+var auth001AllowMarkers = map[string]struct{}{
+	"allow":     {},
+	"allowed":   {},
+	"allows":    {},
+	"grant":     {},
+	"granted":   {},
+	"grants":    {},
+	"permit":    {},
+	"permits":   {},
+	"permitted": {},
+	"statusok":  {},
+	"success":   {},
+	"succeeded": {},
+	"succeeds":  {},
+}
+
+var auth001DenyMarkers = map[string]struct{}{
+	"401":                {},
+	"403":                {},
+	"denied":             {},
+	"denies":             {},
+	"deny":               {},
+	"disallow":           {},
+	"disallowed":         {},
+	"disallows":          {},
+	"forbid":             {},
+	"forbidden":          {},
+	"forbids":            {},
+	"reject":             {},
+	"rejected":           {},
+	"rejects":            {},
+	"statusforbidden":    {},
+	"statusunauthorized": {},
+	"unauthenticated":    {},
+	"unauthorized":       {},
+}
+
+func isAUTH001SecurityNoteLine(text string) bool {
+	lower := strings.ToLower(text)
+	return strings.Contains(lower, "security") ||
+		strings.Contains(lower, "authorization") ||
+		strings.Contains(lower, "authz") ||
+		strings.Contains(lower, "permission")
+}
+
 func matchesERR001Line(text string) bool {
 	if isCommentLike(text) {
 		return false
@@ -437,6 +898,25 @@ func isDOC001Path(filePath string) bool {
 		}
 	}
 	return false
+}
+
+func isGeneratedPath(filePath string) bool {
+	lower := strings.ToLower(filePath)
+	base := strings.ToLower(path.Base(filePath))
+
+	return strings.HasSuffix(base, ".pb.go") ||
+		strings.Contains(base, ".generated.") ||
+		strings.HasPrefix(base, "generated_") ||
+		hasPathSegment(lower, "generated") ||
+		hasPathSegment(lower, "gen")
+}
+
+func isExamplePath(filePath string) bool {
+	lower := strings.ToLower(filePath)
+	return strings.HasPrefix(lower, "examples/") ||
+		strings.Contains(lower, "/examples/") ||
+		strings.HasPrefix(lower, "example/") ||
+		strings.Contains(lower, "/example/")
 }
 
 func hasPathSegment(filePath, segment string) bool {

@@ -47,6 +47,24 @@ func TestEvaluateFixtures(t *testing.T) {
 		{name: "api001 deleted docs companion", file: "api001_deleted_docs.diff", want: []string{"API001"}},
 		{name: "api001 docs only", file: "api001_docs_only.diff", want: nil},
 		{name: "api001 unrelated docs companion", file: "api001_unrelated_docs.diff", want: []string{"API001"}},
+		{name: "auth001 positive", file: "auth001_positive.diff", want: []string{"AUTH001"}},
+		{name: "auth001 middleware positive", file: "auth001_middleware_positive.diff", want: []string{"AUTH001"}},
+		{name: "auth001 allow deny companion satisfied", file: "auth001_companion.diff", want: nil},
+		{name: "auth001 allow deny companion empty context satisfied", file: "auth001_companion_empty_context.diff", want: nil},
+		{name: "auth001 allow deny companion without specific terms satisfied", file: "auth001_companion_no_specific_terms.diff", want: nil},
+		{name: "auth001 security note empty context satisfied", file: "auth001_security_note_empty_context.diff", want: nil},
+		{name: "auth001 metadata test rename satisfied", file: "auth001_metadata_test_rename.diff", want: nil},
+		{name: "auth001 security note companion satisfied", file: "auth001_security_note_companion.diff", want: nil},
+		{name: "auth001 deleted companion", file: "auth001_deleted_companion.diff", want: []string{"AUTH001"}},
+		{name: "auth001 empty context unrelated tests still warns", file: "auth001_empty_context_unrelated_tests.diff", want: []string{"AUTH001"}},
+		{name: "auth001 removed companion", file: "auth001_removed_companion.diff", want: []string{"AUTH001"}},
+		{name: "auth001 unrelated companion", file: "auth001_unrelated_companion.diff", want: []string{"AUTH001"}},
+		{name: "auth001 security code unrelated companion", file: "auth001_security_code_unrelated.diff", want: []string{"AUTH001"}},
+		{name: "auth001 unrelated 200 with deny still warns", file: "auth001_unrelated_200_with_deny.diff", want: []string{"AUTH001"}},
+		{name: "auth001 examples only negative", file: "auth001_negative_examples_only.diff", want: nil},
+		{name: "auth001 non-auth path negative", file: "auth001_negative_non_auth_path.diff", want: nil},
+		{name: "auth001 generated only negative", file: "auth001_negative_generated_only.diff", want: nil},
+		{name: "auth001 tests only negative", file: "auth001_negative_tests_only.diff", want: nil},
 		{name: "err001 positive", file: "err001_positive.diff", want: []string{"ERR001"}},
 		{name: "err001 companion satisfied", file: "err001_companion.diff", want: nil},
 		{name: "err001 removed-only companion satisfied", file: "err001_removed_companion.diff", want: nil},
@@ -89,6 +107,7 @@ func TestFindingsIncludeRequiredFields(t *testing.T) {
 		"db002_positive.diff",
 		"cfg001_positive.diff",
 		"api001_positive.diff",
+		"auth001_positive.diff",
 		"err001_positive.diff",
 		"doc001_positive.diff",
 	}
@@ -214,6 +233,32 @@ func TestCommentLikeAllowsPointerDerefAndMarkdownCompanionLines(t *testing.T) {
 	}
 	if !fileHasPositiveChange(file, []string{"users"}, companionTermsMatch) {
 		t.Fatalf("fileHasPositiveChange() = false, want markdown companion line to count")
+	}
+}
+
+func TestAUTH001AllowDenyMarkersAreTokenBased(t *testing.T) {
+	t.Parallel()
+
+	if !isAUTH001AllowLine(`t.Run("allows valid user", func(t *testing.T) {})`) {
+		t.Fatalf("isAUTH001AllowLine() = false, want true for allows marker")
+	}
+	if !isAUTH001AllowLine(`assert.Equal(t, http.StatusOK, status)`) {
+		t.Fatalf("isAUTH001AllowLine() = false, want true for StatusOK marker")
+	}
+	if isAUTH001AllowLine(`expectedRetryBudget := 200`) {
+		t.Fatalf("isAUTH001AllowLine() = true, want false for bare 200 marker")
+	}
+	if isAUTH001AllowLine(`t.Run("disallows viewer", func(t *testing.T) {})`) {
+		t.Fatalf("isAUTH001AllowLine() = true, want false for disallows marker")
+	}
+	if isAUTH001AllowLine(`t.Run("unsuccessful login", func(t *testing.T) {})`) {
+		t.Fatalf("isAUTH001AllowLine() = true, want false for unsuccessful marker")
+	}
+	if !isAUTH001DenyLine(`t.Run("disallows viewer", func(t *testing.T) {})`) {
+		t.Fatalf("isAUTH001DenyLine() = false, want true for disallows marker")
+	}
+	if !isAUTH001DenyLine(`assert.Equal(t, http.StatusForbidden, status)`) {
+		t.Fatalf("isAUTH001DenyLine() = false, want true for StatusForbidden marker")
 	}
 }
 

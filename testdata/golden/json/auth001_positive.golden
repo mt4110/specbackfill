@@ -1,0 +1,44 @@
+{
+  "version": "v0",
+  "summary": {
+    "error": 0,
+    "warn": 1,
+    "info": 0
+  },
+  "repo_profile": {
+    "go": false,
+    "node": false,
+    "prisma": false,
+    "openapi": false,
+    "proto": false,
+    "migrations": false
+  },
+  "findings": [
+    {
+      "rule_id": "AUTH001",
+      "severity": "warn",
+      "confidence": "high",
+      "title": "Authn/Authz branch changed, but no matching allow/deny or security-sensitive note companion moved with this diff",
+      "why": "Authorization-sensitive lines moved in the diff, but no matching allow/deny test or security-sensitive note evidence moved with them.",
+      "evidence": [
+        {
+          "file": "internal/auth/permissions.go",
+          "line": 5,
+          "kind": "removed",
+          "excerpt": "return user.Role == \"admin\""
+        },
+        {
+          "file": "internal/auth/permissions.go",
+          "line": 5,
+          "kind": "added",
+          "excerpt": "return user.Role == \"admin\" || user.Scope == \"accounts:manage\""
+        }
+      ],
+      "expected_companions": [
+        "allow test",
+        "deny test",
+        "security-sensitive note"
+      ]
+    }
+  ]
+}

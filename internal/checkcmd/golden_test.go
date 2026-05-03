@@ -23,6 +23,7 @@ func TestGoldenOutputs(t *testing.T) {
 		{name: "db002_positive", fixture: "db002_positive.diff"},
 		{name: "cfg001_positive", fixture: "cfg001_positive.diff"},
 		{name: "api001_positive", fixture: "api001_positive.diff"},
+		{name: "auth001_positive", fixture: "auth001_positive.diff"},
 		{name: "err001_positive", fixture: "err001_positive.diff"},
 		{name: "doc001_positive", fixture: "doc001_positive.diff"},
 		{name: "db001_companion", fixture: "db001_companion.diff"},

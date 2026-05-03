@@ -1,0 +1,14 @@
+--- a/internal/auth/guard.go
++++ b/internal/auth/guard.go
+@@ -1,3 +1,3 @@
+ func reject(user User) error {
+-  return unauthorized(user)
++  return forbidden(user)
+ }
+--- a/internal/auth/guard_test.go
++++ b/internal/auth/guard_test.go
+@@ -1,2 +1,4 @@
+ func TestGuard(t *testing.T) {
++  t.Run("allows valid user", func(t *testing.T) {})
++  t.Run("denies invalid user", func(t *testing.T) {})
+ }

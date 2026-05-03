@@ -1,0 +1,10 @@
+--- a/internal/middleware/access.go
++++ b/internal/middleware/access.go
+@@ -1,5 +1,5 @@
+ func RequireProjectAccess(user User, project Project) error {
+-  if user.Role != "admin" {
++  if user.Role != "admin" && !user.Scope.Has("projects:read") {
+     return ErrForbidden
+   }
+   return nil
+ }

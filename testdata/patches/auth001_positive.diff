@@ -1,0 +1,10 @@
+--- a/internal/auth/permissions.go
++++ b/internal/auth/permissions.go
+@@ -1,6 +1,6 @@
+ func CanManageAccount(user User, account Account) bool {
+   if user.ID == account.OwnerID {
+     return true
+   }
+-  return user.Role == "admin"
++  return user.Role == "admin" || user.Scope == "accounts:manage"
+ }
