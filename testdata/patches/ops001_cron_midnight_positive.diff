@@ -1,0 +1,7 @@
+--- a/internal/scheduler/daily_jobs.go
++++ b/internal/scheduler/daily_jobs.go
+@@ -1,3 +1,3 @@
+ func registerJobs(s *Scheduler) {
+-  s.Add("billing-rollup", "@daily", runBillingRollup)
++  s.Add("billing-rollup", "@midnight", runBillingRollup)
+ }

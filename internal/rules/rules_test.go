@@ -76,10 +76,13 @@ func TestEvaluateFixtures(t *testing.T) {
 		{name: "ops001 positive", file: "ops001_positive.diff", want: []string{"OPS001"}},
 		{name: "ops001 ops path positive", file: "ops001_ops_path_positive.diff", want: []string{"OPS001"}},
 		{name: "ops001 topic positive", file: "ops001_topic_positive.diff", want: []string{"OPS001"}},
+		{name: "ops001 topic basename positive", file: "ops001_topic_basename_positive.diff", want: []string{"OPS001"}},
 		{name: "ops001 cron positive", file: "ops001_cron_positive.diff", want: []string{"OPS001"}},
 		{name: "ops001 cron named fields positive", file: "ops001_cron_named_fields_positive.diff", want: []string{"OPS001"}},
+		{name: "ops001 cron midnight positive", file: "ops001_cron_midnight_positive.diff", want: []string{"OPS001"}},
 		{name: "ops001 consumer behavior positive", file: "ops001_consumer_behavior_positive.diff", want: []string{"OPS001"}},
 		{name: "ops001 companion satisfied", file: "ops001_companion.diff", want: nil},
+		{name: "ops001 fallback companion satisfied", file: "ops001_fallback_companion.diff", want: nil},
 		{name: "ops001 observability companion satisfied", file: "ops001_observability_companion.diff", want: nil},
 		{name: "ops001 deleted companion", file: "ops001_deleted_companion.diff", want: []string{"OPS001"}},
 		{name: "ops001 removed companion", file: "ops001_removed_companion.diff", want: []string{"OPS001"}},
@@ -283,11 +286,17 @@ func TestAUTH001AllowDenyMarkersAreTokenBased(t *testing.T) {
 func TestOPS001LineMatchingAvoidsPackageDeclarationFalsePositives(t *testing.T) {
 	t.Parallel()
 
-	if matchesOPS001Line("internal/workers/consumer.go", "package workers") {
+	if matchesOPS001Line("internal/workers/consumer.go", "package retry") {
 		t.Fatalf("matchesOPS001Line() = true, want false for package declaration")
 	}
 	if matchesOPS001Line("internal/consumers/worker.go", "package consumers") {
 		t.Fatalf("matchesOPS001Line() = true, want false for package declaration containing trigger term")
+	}
+	if matchesOPS001Line("internal/consumers/worker.go", `import "example.com/project/retry"`) {
+		t.Fatalf("matchesOPS001Line() = true, want false for import declaration containing trigger term")
+	}
+	if matchesOPS001Line("internal/consumers/worker.go", `"example.com/project/retry"`) {
+		t.Fatalf("matchesOPS001Line() = true, want false for import path containing trigger term")
 	}
 	if !matchesOPS001Line("internal/consumers/worker.go", "message.Ack(ctx)") {
 		t.Fatalf("matchesOPS001Line() = false, want true for explicit Ack call")

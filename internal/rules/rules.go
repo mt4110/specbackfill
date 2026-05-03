@@ -14,7 +14,7 @@ var alnumTokenRE = regexp.MustCompile(`[a-z0-9]+`)
 var httpStatusRE = regexp.MustCompile(`\bhttp\.Status[A-Z][A-Za-z0-9_]+\b`)
 var grpcCodeRE = regexp.MustCompile(`\bcodes\.[A-Z][A-Za-z0-9_]+\b`)
 var durationLiteralRE = regexp.MustCompile(`\b\d+\s*(ms|s|m|h)\b`)
-var cronExpressionRE = regexp.MustCompile(`(?i)["'](?:@(?:annually|yearly|monthly|weekly|daily|hourly|reboot)|(?:[a-z0-9*/?,lw#-]+\s+){4,6}[a-z0-9*/?,lw#-]+)["']`)
+var cronExpressionRE = regexp.MustCompile(`(?i)["'](?:@(?:annually|yearly|monthly|weekly|daily|midnight|hourly|reboot)|(?:[a-z0-9*/?,lw#-]+\s+){4,6}[a-z0-9*/?,lw#-]+)["']`)
 
 func Evaluate(diff model.Diff, _ model.RepoProfile) []model.Finding {
 	findings := make([]model.Finding, 0, 8)
@@ -955,6 +955,11 @@ func isOPS001TriggerPath(filePath string) bool {
 	}
 
 	base := strings.ToLower(path.Base(filePath))
+	baseName := strings.TrimSuffix(base, path.Ext(base))
+	if isOPS001TopicBaseName(baseName) {
+		return true
+	}
+
 	for _, hint := range []string{"worker", "queue", "consumer", "subscriber", "publisher", "job", "cron", "schedule", "retry", "backoff"} {
 		if strings.Contains(base, hint) {
 			return true
@@ -974,7 +979,7 @@ func matchesOPS001Line(filePath, text string) bool {
 	}
 
 	lower := strings.ToLower(trimmed)
-	if isOPS001DeclarationLine(lower) {
+	if isOPS001SyntaxOnlyLine(lower) {
 		return false
 	}
 
@@ -1031,8 +1036,24 @@ func matchesOPS001Line(filePath, text string) bool {
 	return isOPS001TimingPath(filePath) && (strings.Contains(lower, "time.") || durationLiteralRE.MatchString(lower))
 }
 
-func isOPS001DeclarationLine(lower string) bool {
-	return strings.HasPrefix(lower, "package ")
+func isOPS001TopicBaseName(baseName string) bool {
+	return baseName == "topic" ||
+		baseName == "topics" ||
+		strings.Contains(baseName, "_topic") ||
+		strings.Contains(baseName, "topic_") ||
+		strings.Contains(baseName, "-topic") ||
+		strings.Contains(baseName, "topic-")
+}
+
+func isOPS001SyntaxOnlyLine(lower string) bool {
+	return strings.HasPrefix(lower, "package ") ||
+		strings.HasPrefix(lower, "import ") ||
+		lower == "import (" ||
+		isOPS001ImportPathLine(lower)
+}
+
+func isOPS001ImportPathLine(lower string) bool {
+	return strings.HasPrefix(lower, `"`) && strings.HasSuffix(lower, `"`) && strings.Contains(lower, "/")
 }
 
 func isOPS001CronPath(filePath string) bool {
@@ -1151,7 +1172,7 @@ func addOPS001FallbackPathTerm(seen map[string]struct{}, terms *[]string, term s
 	if len(term) < 3 {
 		return
 	}
-	if _, blocked := ignoredOPS001SearchTerms[term]; blocked {
+	if _, blocked := ignoredOPS001FallbackPathTerms[term]; blocked {
 		return
 	}
 	if _, exists := seen[term]; exists {
@@ -1223,6 +1244,22 @@ var ignoredOPS001SearchTerms = map[string]struct{}{
 	"ts":            {},
 	"worker":        {},
 	"workers":       {},
+}
+
+var ignoredOPS001FallbackPathTerms = map[string]struct{}{
+	"go":         {},
+	"internal":   {},
+	"kafka":      {},
+	"message":    {},
+	"messages":   {},
+	"messaging":  {},
+	"operations": {},
+	"ops":        {},
+	"pubsub":     {},
+	"rabbitmq":   {},
+	"service":    {},
+	"sns":        {},
+	"sqs":        {},
 }
 
 func isOPS001CompanionPath(filePath string) bool {
