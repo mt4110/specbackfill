@@ -1,0 +1,7 @@
+--- a/tests/contract/openapi.yaml
++++ b/tests/contract/openapi.yaml
+@@ -1 +1,4 @@
+ paths:
++  /users:
++    get:
++      summary: list users

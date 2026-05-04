@@ -1,0 +1,4 @@
+diff --git a/internal/config/load.go b/internal/config/loader.go
+similarity index 100%
+rename from internal/config/load.go
+rename to internal/config/loader.go

@@ -1,0 +1,4 @@
+diff --git a/internal/http/errors.go b/internal/http/status_errors.go
+similarity index 100%
+rename from internal/http/errors.go
+rename to internal/http/status_errors.go

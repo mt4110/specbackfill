@@ -270,6 +270,16 @@ func TestInputSourceEquivalenceByRule(t *testing.T) {
 			},
 		},
 		{
+			name:     "auth001",
+			wantRule: "AUTH001",
+			setup: func(t *testing.T, repo string) {
+				writeRepoFile(t, filepath.Join(repo, "internal", "auth", "permissions.go"), "package auth\n\nfunc CanRead(role string) bool {\n  return role == \"admin\"\n}\n")
+			},
+			change: func(t *testing.T, repo string) {
+				writeRepoFile(t, filepath.Join(repo, "internal", "auth", "permissions.go"), "package auth\n\nfunc CanRead(role string) bool {\n  return role == \"admin\" || hasPermission(role, \"billing:read\")\n}\n")
+			},
+		},
+		{
 			name:     "err001",
 			wantRule: "ERR001",
 			setup: func(t *testing.T, repo string) {

@@ -1,0 +1,7 @@
+--- a/generated/openapi/openapi.yaml
++++ b/generated/openapi/openapi.yaml
+@@ -1 +1,4 @@
+ paths:
++  /users:
++    get:
++      summary: list users

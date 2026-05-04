@@ -1,0 +1,4 @@
+diff --git a/schema.prisma b/prisma/schema.prisma
+similarity index 100%
+rename from schema.prisma
+rename to prisma/schema.prisma

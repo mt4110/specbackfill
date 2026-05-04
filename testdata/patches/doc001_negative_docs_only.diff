@@ -1,0 +1,5 @@
+--- a/docs/generated/openapi/client.gen.ts
++++ b/docs/generated/openapi/client.gen.ts
+@@ -1 +1,2 @@
+ export type User = { id: string }
++export type UserList = User[]

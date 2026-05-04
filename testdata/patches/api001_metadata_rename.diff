@@ -1,0 +1,4 @@
+diff --git a/openapi.yaml b/api/openapi.yaml
+similarity index 100%
+rename from openapi.yaml
+rename to api/openapi.yaml
