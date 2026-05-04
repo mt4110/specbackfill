@@ -101,6 +101,117 @@ func TestRunDiffFileJSON(t *testing.T) {
 	}
 }
 
+func TestRunDiffFileJSONWithExplain(t *testing.T) {
+	t.Parallel()
+
+	fixture := writeFixtureCopy(t, "db001_positive.diff")
+	report, code, stderr := runCheckJSON(t, t.TempDir(), []string{"--diff-file", fixture, "--format", "json", "--fail-on", "off", "--explain"})
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr=%q", code, stderr)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if len(report.Findings) != 1 {
+		t.Fatalf("len(report.Findings) = %d, want 1", len(report.Findings))
+	}
+	if len(report.Explanations) != 1 {
+		t.Fatalf("len(report.Explanations) = %d, want 1", len(report.Explanations))
+	}
+
+	finding := report.Findings[0]
+	explanation := report.Explanations[0]
+	if explanation.RuleID != finding.RuleID {
+		t.Fatalf("explanation.RuleID = %q, want %q", explanation.RuleID, finding.RuleID)
+	}
+	if explanation.FindingIndex != 0 {
+		t.Fatalf("explanation.FindingIndex = %d, want 0", explanation.FindingIndex)
+	}
+	if len(explanation.Evidence) != len(finding.Evidence) {
+		t.Fatalf("explanation evidence = %+v, want %+v", explanation.Evidence, finding.Evidence)
+	}
+	if len(explanation.ExpectedCompanions) != len(finding.ExpectedCompanions) {
+		t.Fatalf("explanation companions = %+v, want %+v", explanation.ExpectedCompanions, finding.ExpectedCompanions)
+	}
+	if !strings.Contains(explanation.Summary, "does not claim repository-wide absence") {
+		t.Fatalf("explanation summary = %q, want diff-local guardrail", explanation.Summary)
+	}
+}
+
+func TestRunDiffFileExplainPreservesFindingsAndExitCode(t *testing.T) {
+	t.Parallel()
+
+	fixture := writeFixtureCopy(t, "db001_positive.diff")
+
+	baseReport, baseCode, baseStderr := runCheckJSON(t, t.TempDir(), []string{"--diff-file", fixture, "--format", "json", "--fail-on", "error"})
+	explainedReport, explainedCode, explainedStderr := runCheckJSON(t, t.TempDir(), []string{"--diff-file", fixture, "--format", "json", "--fail-on", "error", "--explain"})
+	if baseStderr != "" || explainedStderr != "" {
+		t.Fatalf("unexpected stderr base=%q explained=%q", baseStderr, explainedStderr)
+	}
+	if baseCode != explainedCode {
+		t.Fatalf("exit codes differ: base=%d explained=%d", baseCode, explainedCode)
+	}
+	if baseCode != 1 {
+		t.Fatalf("Run() code = %d, want 1", baseCode)
+	}
+	if baseReport.Summary != explainedReport.Summary {
+		t.Fatalf("summaries differ: base=%+v explained=%+v", baseReport.Summary, explainedReport.Summary)
+	}
+	if !equalStrings(ruleIDsFromReport(baseReport), ruleIDsFromReport(explainedReport)) {
+		t.Fatalf("rule IDs differ: base=%v explained=%v", ruleIDsFromReport(baseReport), ruleIDsFromReport(explainedReport))
+	}
+	if len(baseReport.Explanations) != 0 {
+		t.Fatalf("base explanations = %+v, want empty", baseReport.Explanations)
+	}
+	if len(explainedReport.Explanations) != len(explainedReport.Findings) {
+		t.Fatalf("explained report has %d explanations for %d findings", len(explainedReport.Explanations), len(explainedReport.Findings))
+	}
+}
+
+func TestRunDiffFileTextWithExplain(t *testing.T) {
+	t.Parallel()
+
+	fixture := writeFixtureCopy(t, "db001_positive.diff")
+	stdout, stderr, code := runCheckText(t, t.TempDir(), []string{"--diff-file", fixture, "--format", "text", "--fail-on", "off", "--explain"})
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr=%q", code, stderr)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if !strings.Contains(stdout, "  explanation: This explains the existing DB001 finding") {
+		t.Fatalf("text output missing explanation:\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "schema.prisma:3:+ email String @unique") {
+		t.Fatalf("text output missing evidence reference:\n%s", stdout)
+	}
+	if strings.Contains(strings.ToLower(stdout), "migration is missing") {
+		t.Fatalf("text output violated diff-local wording:\n%s", stdout)
+	}
+}
+
+func TestRunDiffFileExplainWithoutFindingsKeepsBaseOutputAvailable(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	diffPath := filepath.Join(dir, "change.diff")
+	diffText := "--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new\n"
+	if err := os.WriteFile(diffPath, []byte(diffText), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	report, code, stderr := runCheckJSON(t, dir, []string{"--diff-file", diffPath, "--format", "json", "--fail-on", "off", "--explain"})
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr=%q", code, stderr)
+	}
+	if len(report.Findings) != 0 {
+		t.Fatalf("len(report.Findings) = %d, want 0", len(report.Findings))
+	}
+	if len(report.Explanations) != 0 {
+		t.Fatalf("len(report.Explanations) = %d, want 0", len(report.Explanations))
+	}
+}
+
 func TestRunDiffFileUsesProvidedCwdForRelativePath(t *testing.T) {
 	t.Parallel()
 

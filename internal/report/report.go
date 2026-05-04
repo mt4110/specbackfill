@@ -107,9 +107,23 @@ func writeText(w io.Writer, diff model.Diff, result model.Report) error {
 				return err
 			}
 		}
+		if explanation, ok := explanationForFinding(result.Explanations, index, finding.RuleID); ok {
+			if _, err := fmt.Fprintf(w, "  explanation: %s\n", explanation.Summary); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
+}
+
+func explanationForFinding(explanations []model.Explanation, index int, ruleID string) (model.Explanation, bool) {
+	for _, explanation := range explanations {
+		if explanation.FindingIndex == index && explanation.RuleID == ruleID {
+			return explanation, true
+		}
+	}
+	return model.Explanation{}, false
 }
 
 func writeJSON(w io.Writer, result model.Report) error {

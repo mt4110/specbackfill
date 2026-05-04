@@ -82,6 +82,7 @@ v0 MUST remain usable with diff input alone.
 specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
                   [--format text|json]
                   [--fail-on error|warn|off]
+                  [--explain]
 ```
 
 ### 4.2 Input sources
@@ -102,6 +103,8 @@ v0 MUST support the following formats:
 | --- | --- |
 | `text` | human-oriented |
 | `json` | CI and downstream processing |
+
+`--explain` MAY add grounded explanations for existing findings. It MUST NOT create findings, change rule evaluation, or make the core command depend on AI availability.
 
 ### 4.4 Severity threshold
 
@@ -340,6 +343,17 @@ Recommended structure:
 ```
 
 Implementations MAY add extra fields, but MUST NOT remove the required semantic content.
+
+When `--explain` is enabled, JSON output MAY include an additive top-level `explanations` field. Each explanation MUST be tied to an existing finding and SHOULD include:
+
+- `finding_index`
+- `rule_id`
+- `source`
+- `summary`
+- `evidence`
+- `expected_companions`
+
+The `findings` array remains the deterministic machine contract. Explanations MUST preserve rule IDs, evidence references, and expected companion categories.
 
 ## 9. Default v0 Rule Pack
 
@@ -602,12 +616,15 @@ The implementation SHOULD behave consistently across working-tree, git-range, an
 
 AI is out of scope for the detection core in v0.
 
-If an explanation layer is added later, it MUST satisfy all of the following:
+The optional explanation layer is not a detection layer. It MUST satisfy all of the following:
 
 - consume existing findings rather than inventing new ones
 - preserve rule IDs
 - preserve evidence references
 - keep the core check command fully usable without AI availability
+- avoid external service, PR metadata, GitHub App, PR comment posting, SARIF, repository mutation, and auto-fix requirements
+
+If explanation output is unavailable, disabled, or empty, deterministic text and JSON findings MUST remain available.
 
 ## 13. Conformance Summary
 
