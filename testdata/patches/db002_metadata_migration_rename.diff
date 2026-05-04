@@ -1,0 +1,4 @@
+diff --git a/prisma/migrations/20260401010101_drop_legacy_login/migration.sql b/prisma/migrations/20260401010101_drop_legacy_login_column/migration.sql
+similarity index 100%
+rename from prisma/migrations/20260401010101_drop_legacy_login/migration.sql
+rename to prisma/migrations/20260401010101_drop_legacy_login_column/migration.sql

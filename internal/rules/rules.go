@@ -101,7 +101,7 @@ func evaluateDB002(diff model.Diff) (model.Finding, bool) {
 
 func evaluateCFG001(diff model.Diff) (model.Finding, bool) {
 	evidence := collectEvidence(diff, 3, func(file model.File, line model.Line) bool {
-		if isCFGCompanionPath(file.Path) {
+		if isCFG001SuppressedPath(file.Path) {
 			return false
 		}
 		return line.Kind == model.LineKindAdded && matchesCFG001Line(line.Text)
@@ -138,7 +138,7 @@ func evaluateCFG001(diff model.Diff) (model.Finding, bool) {
 
 func evaluateAPI001(diff model.Diff) (model.Finding, bool) {
 	evidence := collectEvidence(diff, 3, func(file model.File, line model.Line) bool {
-		return isAPIPath(file.Path) && isChangedLine(line) && isMeaningfulAPILine(line.Text)
+		return isAPI001TriggerPath(file.Path) && isChangedLine(line) && isMeaningfulAPILine(line.Text)
 	})
 	if len(evidence) == 0 {
 		return model.Finding{}, false
@@ -190,7 +190,7 @@ func evaluateAUTH001(diff model.Diff) (model.Finding, bool) {
 
 func evaluateERR001(diff model.Diff) (model.Finding, bool) {
 	evidence := collectEvidence(diff, 3, func(file model.File, line model.Line) bool {
-		if isERR001CompanionPath(file.Path) {
+		if isERR001SuppressedPath(file.Path) {
 			return false
 		}
 		return isChangedLine(line) && matchesERR001Line(line.Text)
@@ -431,7 +431,18 @@ func isCFGCompanionPath(filePath string) bool {
 		filePath == ".env.example" ||
 		filePath == ".env.sample" ||
 		strings.HasPrefix(path.Base(filePath), "config.example") ||
-		strings.HasPrefix(filePath, "examples/")
+		isExamplePath(filePath)
+}
+
+func isCFG001SuppressedPath(filePath string) bool {
+	return isCFGCompanionPath(filePath) || isGeneratedPath(filePath) || isConventionalTestPath(filePath)
+}
+
+func isAPI001TriggerPath(filePath string) bool {
+	if isGeneratedPath(filePath) || isConventionalTestPath(filePath) || isExamplePath(filePath) {
+		return false
+	}
+	return isAPIPath(filePath)
 }
 
 func isAPIPath(filePath string) bool {
@@ -913,6 +924,10 @@ func isERR001CompanionPath(filePath string) bool {
 	return isDocCompanionPath(filePath) || isConventionalTestPath(filePath)
 }
 
+func isERR001SuppressedPath(filePath string) bool {
+	return isERR001CompanionPath(filePath) || isGeneratedPath(filePath) || isExamplePath(filePath)
+}
+
 func isOPS001TriggerPath(filePath string) bool {
 	if isGeneratedPath(filePath) || isDocCompanionPath(filePath) || isConventionalTestPath(filePath) || isExamplePath(filePath) {
 		return false
@@ -1380,6 +1395,10 @@ func isOPS001CompanionLine(text string) bool {
 }
 
 func isDOC001Path(filePath string) bool {
+	if isDocCompanionPath(filePath) || isConventionalTestPath(filePath) || isExamplePath(filePath) {
+		return false
+	}
+
 	lower := strings.ToLower(filePath)
 	if strings.HasSuffix(lower, ".pb.go") {
 		return true

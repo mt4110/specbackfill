@@ -1,0 +1,4 @@
+diff --git a/internal/auth/permissions.go b/internal/auth/authz_permissions.go
+similarity index 100%
+rename from internal/auth/permissions.go
+rename to internal/auth/authz_permissions.go

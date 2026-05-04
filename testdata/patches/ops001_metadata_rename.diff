@@ -1,0 +1,4 @@
+diff --git a/internal/workers/billing_consumer.go b/internal/workers/billing_events_consumer.go
+similarity index 100%
+rename from internal/workers/billing_consumer.go
+rename to internal/workers/billing_events_consumer.go

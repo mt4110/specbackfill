@@ -1,0 +1,4 @@
+diff --git a/generated/openapi/client.gen.ts b/generated/openapi/users_client.gen.ts
+similarity index 100%
+rename from generated/openapi/client.gen.ts
+rename to generated/openapi/users_client.gen.ts

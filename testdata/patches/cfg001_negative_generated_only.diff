@@ -1,0 +1,7 @@
+--- a/internal/config/generated/env.gen.go
++++ b/internal/config/generated/env.gen.go
+@@ -1,3 +1,4 @@
+ package generated
+ func key() string {
++  return os.Getenv("NEW_API_TOKEN")
+ }
