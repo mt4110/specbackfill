@@ -55,6 +55,28 @@ func TestGoldenOutputs(t *testing.T) {
 	}
 }
 
+func TestGoldenExplainOutputs(t *testing.T) {
+	t.Parallel()
+
+	fixture := writeFixtureCopy(t, "db001_positive.diff")
+	for _, format := range []string{"text", "json"} {
+		format := format
+		t.Run(format, func(t *testing.T) {
+			t.Parallel()
+
+			stdout, code, stderr := runCheckOutput(t, t.TempDir(), []string{"--diff-file", fixture, "--format", format, "--fail-on", "off", "--explain"})
+			if code != 0 {
+				t.Fatalf("Run() code = %d, want 0; stderr=%q", code, stderr)
+			}
+			if stderr != "" {
+				t.Fatalf("stderr = %q, want empty", stderr)
+			}
+
+			assertGolden(t, format, "db001_positive_explain", stdout)
+		})
+	}
+}
+
 func TestCrossSourceOutputEquivalence(t *testing.T) {
 	t.Parallel()
 
