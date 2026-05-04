@@ -58,22 +58,33 @@ func TestGoldenOutputs(t *testing.T) {
 func TestGoldenExplainOutputs(t *testing.T) {
 	t.Parallel()
 
-	fixture := writeFixtureCopy(t, "db001_positive.diff")
-	for _, format := range []string{"text", "json"} {
-		format := format
-		t.Run(format, func(t *testing.T) {
-			t.Parallel()
+	cases := []struct {
+		name    string
+		fixture string
+	}{
+		{name: "db001_positive_explain", fixture: "db001_positive.diff"},
+		{name: "db001_db002_positive_explain", fixture: "db001_db002_positive.diff"},
+	}
 
-			stdout, code, stderr := runCheckOutput(t, t.TempDir(), []string{"--diff-file", fixture, "--format", format, "--fail-on", "off", "--explain"})
-			if code != 0 {
-				t.Fatalf("Run() code = %d, want 0; stderr=%q", code, stderr)
-			}
-			if stderr != "" {
-				t.Fatalf("stderr = %q, want empty", stderr)
-			}
+	for _, tc := range cases {
+		tc := tc
+		for _, format := range []string{"text", "json"} {
+			format := format
+			t.Run(tc.name+"/"+format, func(t *testing.T) {
+				t.Parallel()
 
-			assertGolden(t, format, "db001_positive_explain", stdout)
-		})
+				fixture := writeFixtureCopy(t, tc.fixture)
+				stdout, code, stderr := runCheckOutput(t, t.TempDir(), []string{"--diff-file", fixture, "--format", format, "--fail-on", "off", "--explain"})
+				if code != 0 {
+					t.Fatalf("Run() code = %d, want 0; stderr=%q", code, stderr)
+				}
+				if stderr != "" {
+					t.Fatalf("stderr = %q, want empty", stderr)
+				}
+
+				assertGolden(t, format, tc.name, stdout)
+			})
+		}
 	}
 }
 
