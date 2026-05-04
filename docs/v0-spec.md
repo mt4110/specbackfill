@@ -133,6 +133,21 @@ Tool errors include, but are not limited to:
 - git invocation failures for local/git-range diff acquisition
 - unexpected internal failures
 
+### 4.6 CI usage
+
+CI systems SHOULD invoke the same `specbackfill check` CLI contract used locally.
+
+For pull-request style checks, CI SHOULD either:
+
+- provide both refs to `--base <ref> --head <ref>`, ensuring both commits are available in the local checkout
+- provide a unified diff through `--diff-file <file>`
+
+`text` output is appropriate for human-readable CI logs. `json` output is for CI and downstream processing.
+
+`--fail-on` controls only whether findings cause exit code `1`; tool errors still cause exit code `2`.
+
+CI integrations MUST NOT require `specbackfill` to depend on PR metadata, GitHub App behavior, automatic PR comment posting, SARIF output, network calls, or external services.
+
 ## 5. Diff Model
 
 The implementation MUST normalize diff input into a structured model.
