@@ -127,12 +127,16 @@ func TestCrossSourceOutputEquivalence(t *testing.T) {
 			tc.change(t, repo)
 			workingText, workingTextCode, workingTextStderr := runCheckOutput(t, repo, []string{"--format", "text", "--fail-on", "off"})
 			workingJSON, workingJSONCode, workingJSONStderr := runCheckOutput(t, repo, []string{"--format", "json", "--fail-on", "off"})
+			workingExplainJSON, workingExplainCode, workingExplainStderr := runCheckOutput(t, repo, []string{"--format", "json", "--fail-on", "off", "--explain"})
 
 			if workingTextCode != 0 || workingTextStderr != "" {
 				t.Fatalf("working text failed: code=%d stderr=%q", workingTextCode, workingTextStderr)
 			}
 			if workingJSONCode != 0 || workingJSONStderr != "" {
 				t.Fatalf("working json failed: code=%d stderr=%q", workingJSONCode, workingJSONStderr)
+			}
+			if workingExplainCode != 0 || workingExplainStderr != "" {
+				t.Fatalf("working explain json failed: code=%d stderr=%q", workingExplainCode, workingExplainStderr)
 			}
 
 			commitAll(t, repo, "head")
@@ -169,6 +173,18 @@ func TestCrossSourceOutputEquivalence(t *testing.T) {
 			report := decodeReport(t, workingJSON)
 			if got := ruleIDsFromReport(report); !equalStrings(got, tc.wantRule) {
 				t.Fatalf("rule IDs = %v, want %v", got, tc.wantRule)
+			}
+
+			rangeExplainJSON, rangeExplainCode, rangeExplainStderr := runCheckOutput(t, repo, []string{"--base", base, "--head", head, "--format", "json", "--fail-on", "off", "--explain"})
+			diffExplainJSON, diffExplainCode, diffExplainStderr := runCheckOutput(t, repo, []string{"--diff-file", patchPath, "--format", "json", "--fail-on", "off", "--explain"})
+			if rangeExplainCode != 0 || rangeExplainStderr != "" {
+				t.Fatalf("range explain json failed: code=%d stderr=%q", rangeExplainCode, rangeExplainStderr)
+			}
+			if diffExplainCode != 0 || diffExplainStderr != "" {
+				t.Fatalf("diff-file explain json failed: code=%d stderr=%q", diffExplainCode, diffExplainStderr)
+			}
+			if workingExplainJSON != rangeExplainJSON || workingExplainJSON != diffExplainJSON {
+				t.Fatalf("explain json outputs differ\nworking:\n%s\nrange:\n%s\ndiff-file:\n%s", workingExplainJSON, rangeExplainJSON, diffExplainJSON)
 			}
 		})
 	}
