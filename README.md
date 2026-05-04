@@ -39,6 +39,44 @@ specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
 
 仕様の詳細と用語の正本は [docs/v0-spec.md](./docs/v0-spec.md) を見てください。
 
+## CI での利用
+
+GitHub Actions では、PR の base/head をローカルに取得してから range diff として点検します。
+
+```yaml
+name: specbackfill
+
+on:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run specbackfill
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          go run ./cmd/specbackfill check \
+            --base "$BASE_SHA" \
+            --head "$HEAD_SHA" \
+            --format text \
+            --fail-on warn
+```
+
+- `fetch-depth: 0`: `--base/--head` の両方をローカルで参照できるようにします。
+- `--format text`: CI log で人が読む用途に向きます。`--format json` は CI や downstream processing 向けです。
+- `--fail-on warn`: `warn` と `error` で exit code `1` にします。`error` は `error` のみ、`off` は finding では失敗しません。
+
 ## ローカル確認
 
 ```bash

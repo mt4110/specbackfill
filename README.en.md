@@ -39,6 +39,44 @@ specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
 
 See [docs/v0-spec.md](./docs/v0-spec.md) for the full normative contract and terminology.
 
+## CI Usage
+
+In GitHub Actions, fetch the PR base/head locally and check them as a range diff.
+
+```yaml
+name: specbackfill
+
+on:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run specbackfill
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          go run ./cmd/specbackfill check \
+            --base "$BASE_SHA" \
+            --head "$HEAD_SHA" \
+            --format text \
+            --fail-on warn
+```
+
+- `fetch-depth: 0`: makes both `--base/--head` commits available locally.
+- `--format text`: best for human-readable CI logs. `--format json` is for CI and downstream processing.
+- `--fail-on warn`: exits `1` for `warn` and `error` findings. `error` fails only on `error`, and `off` never fails because of findings.
+
 ## Local Verification
 
 ```bash
