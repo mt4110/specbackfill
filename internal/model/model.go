@@ -93,10 +93,11 @@ func (p RepoProfile) Labels() []string {
 }
 
 type Report struct {
-	Version     string      `json:"version"`
-	Summary     Summary     `json:"summary"`
-	RepoProfile RepoProfile `json:"repo_profile"`
-	Findings    []Finding   `json:"findings"`
+	Version      string        `json:"version"`
+	Summary      Summary       `json:"summary"`
+	RepoProfile  RepoProfile   `json:"repo_profile"`
+	Findings     []Finding     `json:"findings"`
+	Explanations []Explanation `json:"explanations,omitempty"`
 }
 
 type Summary struct {
@@ -111,6 +112,15 @@ type Finding struct {
 	Confidence         string     `json:"confidence"`
 	Title              string     `json:"title"`
 	Why                string     `json:"why"`
+	Evidence           []Evidence `json:"evidence"`
+	ExpectedCompanions []string   `json:"expected_companions"`
+}
+
+type Explanation struct {
+	FindingIndex       int        `json:"finding_index"`
+	RuleID             string     `json:"rule_id"`
+	Source             string     `json:"source"`
+	Summary            string     `json:"summary"`
 	Evidence           []Evidence `json:"evidence"`
 	ExpectedCompanions []string   `json:"expected_companions"`
 }

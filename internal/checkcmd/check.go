@@ -8,6 +8,7 @@ import (
 
 	"github.com/mt4110/specbackfill/internal/diffparse"
 	"github.com/mt4110/specbackfill/internal/diffsrc"
+	"github.com/mt4110/specbackfill/internal/explain"
 	"github.com/mt4110/specbackfill/internal/profile"
 	"github.com/mt4110/specbackfill/internal/report"
 	"github.com/mt4110/specbackfill/internal/rules"
@@ -22,12 +23,14 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 	var diffFile string
 	var format string
 	var failOn string
+	var includeExplanations bool
 
 	flags.StringVar(&base, "base", "", "base git ref")
 	flags.StringVar(&head, "head", "", "head git ref")
 	flags.StringVar(&diffFile, "diff-file", "", "unified diff file")
 	flags.StringVar(&format, "format", "text", "output format: text|json")
 	flags.StringVar(&failOn, "fail-on", "error", "threshold: error|warn|off")
+	flags.BoolVar(&includeExplanations, "explain", false, "include grounded explanations for emitted findings")
 
 	if err := flags.Parse(args); err != nil {
 		if err == flag.ErrHelp {
@@ -65,6 +68,9 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 
 	findings := rules.Evaluate(diff, repoProfile)
 	result := report.Build(repoProfile, findings)
+	if includeExplanations {
+		result.Explanations = explain.Build(findings)
+	}
 
 	if err := report.Write(stdout, format, diff, result); err != nil {
 		return writeError(stderr, fmt.Sprintf("render report: %v", err))

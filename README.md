@@ -31,11 +31,13 @@ specbackfill は、コード差分から **companion artifacts** の追従漏れ
 specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
                   [--format text|json]
                   [--fail-on error|warn|off]
+                  [--explain]
 ```
 
 - 入力: working tree diff / git range diff / unified diff file
 - 出力: `text` または `json`
 - 終了コード: `0` no findings, `1` findings at threshold, `2` tool error
+- `--explain`: 既存 finding に紐づく grounded explanation を追加します。finding 自体は増やしません。
 
 仕様の詳細と用語の正本は [docs/v0-spec.md](./docs/v0-spec.md) を見てください。
 
@@ -83,6 +85,7 @@ jobs:
 go test ./...
 go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format text --fail-on off
 go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --format json --fail-on off
+go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format json --fail-on off --explain
 ```
 
 ## 実装済みルール

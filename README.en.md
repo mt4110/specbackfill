@@ -31,11 +31,13 @@ When paired with a local LLM review system such as `local-ai-review`, specbackfi
 specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
                   [--format text|json]
                   [--fail-on error|warn|off]
+                  [--explain]
 ```
 
 - Inputs: working tree diff / git range diff / unified diff file
 - Outputs: `text` or `json`
 - Exit codes: `0` no findings, `1` findings at threshold, `2` tool error
+- `--explain`: adds grounded explanations tied to existing findings. It does not add findings.
 
 See [docs/v0-spec.md](./docs/v0-spec.md) for the full normative contract and terminology.
 
@@ -83,6 +85,7 @@ jobs:
 go test ./...
 go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format text --fail-on off
 go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --format json --fail-on off
+go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format json --fail-on off --explain
 ```
 
 ## Implemented Rules
