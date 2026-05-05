@@ -107,6 +107,7 @@ type Summary struct {
 }
 
 type Finding struct {
+	FindingID          string     `json:"finding_id,omitempty"`
 	RuleID             string     `json:"rule_id"`
 	Severity           Severity   `json:"severity"`
 	Confidence         string     `json:"confidence"`

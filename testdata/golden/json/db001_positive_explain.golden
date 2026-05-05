@@ -15,6 +15,7 @@
   },
   "findings": [
     {
+      "finding_id": "v0-3e8fca4b2cdb678b",
       "rule_id": "DB001",
       "severity": "error",
       "confidence": "high",

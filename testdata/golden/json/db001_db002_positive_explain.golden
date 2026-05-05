@@ -15,6 +15,7 @@
   },
   "findings": [
     {
+      "finding_id": "v0-82e2676f0c6030e7",
       "rule_id": "DB001",
       "severity": "error",
       "confidence": "high",
@@ -35,6 +36,7 @@
       ]
     },
     {
+      "finding_id": "v0-6c33055056517ccb",
       "rule_id": "DB002",
       "severity": "warn",
       "confidence": "high",
