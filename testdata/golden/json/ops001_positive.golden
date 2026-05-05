@@ -15,6 +15,7 @@
   },
   "findings": [
     {
+      "finding_id": "v0-bca6ff75742f0f0c",
       "rule_id": "OPS001",
       "severity": "warn",
       "confidence": "high",

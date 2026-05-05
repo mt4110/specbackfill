@@ -59,6 +59,58 @@ func TestWriteJSONSkeleton(t *testing.T) {
 	}
 }
 
+func TestBuildAddsStableFindingID(t *testing.T) {
+	t.Parallel()
+
+	findings := []model.Finding{{
+		RuleID:     "DB001",
+		Severity:   model.SeverityError,
+		Confidence: "high",
+		Title:      "Schema changed",
+		Why:        "schema evidence moved",
+		Evidence: []model.Evidence{{
+			File:    "schema.prisma",
+			Line:    3,
+			Kind:    string(model.LineKindAdded),
+			Excerpt: "email String @unique",
+		}},
+		ExpectedCompanions: []string{"migration file"},
+	}}
+
+	first := Build(model.RepoProfile{}, findings)
+	second := Build(model.RepoProfile{}, findings)
+
+	const wantID = "v0-8362254e793872c2"
+	if first.Findings[0].FindingID != wantID {
+		t.Fatalf("FindingID = %q, want %q", first.Findings[0].FindingID, wantID)
+	}
+	if first.Findings[0].FindingID != second.Findings[0].FindingID {
+		t.Fatalf("FindingID not stable: first=%q second=%q", first.Findings[0].FindingID, second.Findings[0].FindingID)
+	}
+	if findings[0].FindingID != "" {
+		t.Fatalf("Build mutated input finding: %+v", findings[0])
+	}
+}
+
+func TestBuildOverwritesExistingFindingID(t *testing.T) {
+	t.Parallel()
+
+	result := Build(model.RepoProfile{}, []model.Finding{{
+		FindingID:          "non-deterministic-input-id",
+		RuleID:             "CFG001",
+		Severity:           model.SeverityWarn,
+		Confidence:         "medium",
+		Title:              "New config detected",
+		Why:                "config evidence moved",
+		Evidence:           []model.Evidence{{File: "config.go", Kind: string(model.LineKindAdded), Excerpt: `os.Getenv("FOO")`}},
+		ExpectedCompanions: []string{"docs"},
+	}})
+
+	if got := result.Findings[0].FindingID; got == "" || got == "non-deterministic-input-id" {
+		t.Fatalf("FindingID = %q, want generated deterministic ID", got)
+	}
+}
+
 func TestExitCode(t *testing.T) {
 	t.Parallel()
 

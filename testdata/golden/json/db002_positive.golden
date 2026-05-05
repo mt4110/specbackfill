@@ -15,6 +15,7 @@
   },
   "findings": [
     {
+      "finding_id": "v0-0589db7b008ded3f",
       "rule_id": "DB002",
       "severity": "warn",
       "confidence": "high",

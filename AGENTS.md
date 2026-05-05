@@ -41,6 +41,8 @@ Think of it as a small blocker before human or AI review: if a diff changes a sc
 
 This pairs cleanly with `local-ai-review`: `specbackfill` should emit evidence-backed, rule-based diff-local omissions first; `local-ai-review` can then perform broader local LLM review on the PR diff. Do not merge these roles. `specbackfill` should provide deterministic structure before AI interpretation, not become another generic AI reviewer.
 
+`specbackfill` and `local-ai-review` are different products. `specbackfill` owns the deterministic companion-artifact rule engine: stable rule IDs, diff-local evidence, fixture coverage, text output, JSON output, and CLI exit behavior. `local-ai-review` may consume that output as an adapter or downstream review layer, but it must not become the place where `DB001`, `API001`, `CFG001`, or other deterministic companion rules are reimplemented.
+
 If a proposed change makes the tool sound smarter than it is, depends on non-deterministic detection, claims repository-wide absence, or turns the project into a broad code review assistant, stop and keep the scope narrow.
 
 ## 4. Non-negotiables
@@ -89,6 +91,7 @@ Allowed default phases:
 - Phase 3: fixture hardening / false-positive control
 - Phase 4: CI usability
 - Phase 5: AI explanation only
+- Phase 6: design contract / ownership boundary only
 
 Keep changes small.
 Do not widen scope on your own.

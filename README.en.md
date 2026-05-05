@@ -25,6 +25,8 @@ This README is the English counterpart to the Japanese primary entry point. The 
 
 When paired with a local LLM review system such as `local-ai-review`, specbackfill should run first and emit rule-based omission findings. The AI layer may explain or organize those findings, but specbackfill itself must not invent AI findings.
 
+specbackfill is not `local-ai-review`. specbackfill remains the source of truth for deterministic rule IDs, evidence, fixtures, and CLI JSON; `local-ai-review` is a downstream consumer when it chooses to ingest that output.
+
 ## v0 Contract
 
 ```bash

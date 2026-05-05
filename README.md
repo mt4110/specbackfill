@@ -25,6 +25,8 @@ specbackfill は、コード差分から **companion artifacts** の追従漏れ
 
 `local-ai-review` のようなローカル LLM レビュー基盤と併用する場合、specbackfill は先に rule-based な omission finding を出し、AI 側はそれを説明・整理する役割に留めます。specbackfill 自体は AI finding を発明しません。
 
+specbackfill は `local-ai-review` とは別物です。deterministic な rule ID、evidence、fixture、CLI JSON の正本は specbackfill 側に置き、`local-ai-review` は必要ならその出力を取り込む downstream consumer として扱います。
+
 ## v0 の契約
 
 ```bash

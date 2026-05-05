@@ -74,6 +74,18 @@ v0 is intentionally narrow and optimized for backend/service repositories.
 
 v0 MUST remain usable with diff input alone.
 
+### Relationship to downstream review tools
+
+`specbackfill` is not `local-ai-review` and MUST NOT become a broad AI review
+system.
+
+`specbackfill` owns deterministic companion-artifact checks: stable rule IDs,
+diff-local evidence, required finding fields, text output, JSON output, and
+exit behavior. Downstream tools, including `local-ai-review`, MAY consume
+`specbackfill` JSON, store it, summarize it, or compare it with model or human
+review findings. They SHOULD NOT reimplement the same deterministic companion
+rules while `specbackfill` remains the active rule-engine source of truth.
+
 ## 4. Command-Line Interface
 
 ### 4.1 Primary command
@@ -257,6 +269,29 @@ Examples include:
 - deny test
 - runbook update
 
+### 7.6 Finding IDs
+
+Implementations MAY include a `finding_id` for emitted findings.
+
+When present, `finding_id` SHOULD be deterministic for the same finding content
+and SHOULD be derived only from deterministic finding data such as `rule_id`,
+evidence, and expected companion categories.
+
+`finding_id` MUST NOT depend on:
+
+- AI explanations
+- model-authored findings
+- downstream verdicts
+- PR comments
+- PR metadata
+- GitHub metadata
+- network calls
+- wall-clock time
+- random values
+
+Downstream tools MAY store or compare `finding_id`, but MUST still preserve the
+required finding fields.
+
 ## 8. Output Semantics
 
 Human-readable output MUST preserve diff-local wording.
@@ -319,6 +354,7 @@ Recommended structure:
   },
   "findings": [
     {
+      "finding_id": "v0-74e68b9cb49588c2",
       "rule_id": "DB001",
       "severity": "error",
       "confidence": "high",
