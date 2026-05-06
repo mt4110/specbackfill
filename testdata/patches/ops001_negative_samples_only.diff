@@ -1,0 +1,9 @@
+--- a/samples/workers/billing_consumer.go
++++ b/samples/workers/billing_consumer.go
+@@ -1,5 +1,5 @@
+ func ExampleBillingConsumer() Consumer {
+   return Consumer{
+-    Topic: "billing.events",
++    Topic: "billing.v2.events",
+   }
+ }

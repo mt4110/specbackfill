@@ -4,6 +4,14 @@
 
 specbackfill は、コード差分から **companion artifacts** の追従漏れを **diff-local omission** として扱う、rule-based な CLI です。見るのは repo 全体の不足ではなく、**この diff で一緒に動くべきものが同じ diff で動いているか** です。
 
+レビューで毎回出がちな、こういう追従漏れを diff だけから点検します。
+
+- schema を変えたけど migration が同じ diff にない
+- public API を変えたけど contract test が同じ diff にない
+- env/config を増やしたけど default/docs が同じ diff にない
+- authz 分岐を変えたけど allow/deny test が同じ diff にない
+- worker/retry を変えたけど runbook/observability が同じ diff にない
+
 現状の repository には、`specbackfill check` の v0 MVP と実装済みルールの検証 fixture が入っています。
 
 この README は日本語の主入口です。挙動の正本は [docs/v0-spec.md](./docs/v0-spec.md)、変更時の制約は [AGENTS.md](./AGENTS.md) にあります。
@@ -14,6 +22,7 @@ specbackfill は、コード差分から **companion artifacts** の追従漏れ
 - [README.en.md](./README.en.md): 英語版
 - [docs/v0-spec.md](./docs/v0-spec.md): v0 の source of truth
 - [AGENTS.md](./AGENTS.md): 実装・文書変更時の制約
+- [LICENSE](./LICENSE): ライセンス
 
 ## プロダクト境界
 
@@ -43,9 +52,20 @@ specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
 
 仕様の詳細と用語の正本は [docs/v0-spec.md](./docs/v0-spec.md) を見てください。
 
+## インストール
+
+利用者として試す場合は、まず `go install` で CLI を入れます。
+
+```bash
+go install github.com/mt4110/specbackfill/cmd/specbackfill@latest
+specbackfill check --diff-file change.diff --format text --fail-on off
+```
+
+この repository 自体を開発する場合は、`go run ./cmd/specbackfill` でも確認できます。
+
 ## CI での利用
 
-GitHub Actions では、PR の base/head をローカルに取得してから range diff として点検します。
+GitHub Actions では、PR の base/head をローカルに取得してから range diff として点検します。導入直後は `--fail-on off` で advisory output として流し、ノイズ感を確認してから `--fail-on warn` に上げるのがおすすめです。
 
 ```yaml
 name: specbackfill
@@ -63,18 +83,21 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: '1.26.2'
+
+      - name: Install specbackfill
+        run: go install github.com/mt4110/specbackfill/cmd/specbackfill@latest
 
       - name: Run specbackfill
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          go run ./cmd/specbackfill check \
+          specbackfill check \
             --base "$BASE_SHA" \
             --head "$HEAD_SHA" \
             --format text \
-            --fail-on warn
+            --fail-on off
 ```
 
 - `fetch-depth: 0`: `--base/--head` の両方をローカルで参照できるようにします。
@@ -83,11 +106,14 @@ jobs:
 
 ## ローカル確認
 
+mise を使う場合は、この repository の Go toolchain を揃えてから確認できます。
+
 ```bash
-go test ./...
-go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format text --fail-on off
-go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --format json --fail-on off
-go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format json --fail-on off --explain
+mise install
+mise run test
+mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format text --fail-on off
+mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --format json --fail-on off
+mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format json --fail-on off --explain
 ```
 
 ## 実装済みルール
@@ -100,6 +126,34 @@ go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff
 - `ERR001`: Public error/status/code contract changed, no assertion test moved
 - `OPS001`: Worker/queue/retry behavior changed, no observability/runbook moved
 - `DOC001`: Generated spec changed, no hand-written explanation moved
+
+## 検出しない・主張しないこと
+
+specbackfill は「repo に何かが存在しない」とは言いません。この diff で companion artifact が一緒に動いたかだけを見ます。
+
+ノイズを避けるため、v0 は次のような diff では finding を抑える方針です。
+
+- docs-only diffs
+- tests-only diffs
+- generated-file-only diffs
+- example/sample-only diffs where no production contract moved
+- metadata-only renames
+- companion artifacts that moved with concrete companion evidence
+
+## 隣接ツールとの違い
+
+specbackfill は general static analyzer、PR comment bot、team-policy script ではありません。
+
+- Semgrep は code pattern や security/style issue を見つけます。
+- Danger は team-specific な PR 雑務を自動化します。
+- reviewdog は linter finding を diff 上に報告します。
+- specbackfill は implementation change と expected companion artifacts が同じ diff で動いたかを点検します。
+
+中心の finding は「このコードが間違っている」ではなく、「この diff は X を変えたが、companion Y が同じ diff で動いていない」です。
+
+## ライセンス
+
+[MIT License](./LICENSE)
 
 ## ステータス
 

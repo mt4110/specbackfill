@@ -4,6 +4,14 @@
 
 specbackfill is a rule-based CLI that treats missing **companion artifacts** in a code diff as a **diff-local omission**. It does not claim repository-wide absence; it asks whether the things that should have moved with this diff actually moved in the same diff.
 
+It catches the boring review comments teams keep repeating, using only the diff:
+
+- schema changed, but no migration moved in the same diff
+- public API changed, but no contract test moved in the same diff
+- env/config was introduced, but no default/docs companion moved in the same diff
+- authz logic changed, but no allow/deny test moved in the same diff
+- worker/retry behavior changed, but no runbook/observability companion moved in the same diff
+
 The current repository contains the `specbackfill check` v0 MVP and verification fixtures for the implemented rules.
 
 This README is the English counterpart to the Japanese primary entry point. The behavioral source of truth is [docs/v0-spec.md](./docs/v0-spec.md), and contributor constraints live in [AGENTS.md](./AGENTS.md).
@@ -14,6 +22,7 @@ This README is the English counterpart to the Japanese primary entry point. The 
 - [README.en.md](./README.en.md): English counterpart
 - [docs/v0-spec.md](./docs/v0-spec.md): v0 source of truth
 - [AGENTS.md](./AGENTS.md): constraints for implementation and documentation changes
+- [LICENSE](./LICENSE): license
 
 ## Product Boundary
 
@@ -43,9 +52,20 @@ specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
 
 See [docs/v0-spec.md](./docs/v0-spec.md) for the full normative contract and terminology.
 
+## Install
+
+As a user, install the CLI with `go install`:
+
+```bash
+go install github.com/mt4110/specbackfill/cmd/specbackfill@latest
+specbackfill check --diff-file change.diff --format text --fail-on off
+```
+
+When developing this repository itself, `go run ./cmd/specbackfill` is also useful.
+
 ## CI Usage
 
-In GitHub Actions, fetch the PR base/head locally and check them as a range diff.
+In GitHub Actions, fetch the PR base/head locally and check them as a range diff. For a first rollout, start with `--fail-on off` as advisory output, review the noise level, then switch to `--fail-on warn` when the team trusts it.
 
 ```yaml
 name: specbackfill
@@ -63,18 +83,21 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: '1.26.2'
+
+      - name: Install specbackfill
+        run: go install github.com/mt4110/specbackfill/cmd/specbackfill@latest
 
       - name: Run specbackfill
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          go run ./cmd/specbackfill check \
+          specbackfill check \
             --base "$BASE_SHA" \
             --head "$HEAD_SHA" \
             --format text \
-            --fail-on warn
+            --fail-on off
 ```
 
 - `fetch-depth: 0`: makes both `--base/--head` commits available locally.
@@ -83,11 +106,14 @@ jobs:
 
 ## Local Verification
 
+With mise, install the repository toolchain before running checks:
+
 ```bash
-go test ./...
-go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format text --fail-on off
-go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --format json --fail-on off
-go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format json --fail-on off --explain
+mise install
+mise run test
+mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format text --fail-on off
+mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --format json --fail-on off
+mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format json --fail-on off --explain
 ```
 
 ## Implemented Rules
@@ -100,6 +126,34 @@ go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff
 - `ERR001`: Public error/status/code contract changed, no assertion test moved
 - `OPS001`: Worker/queue/retry behavior changed, no observability/runbook moved
 - `DOC001`: Generated spec changed, no hand-written explanation moved
+
+## What It Does Not Claim
+
+specbackfill does not say something is absent from the repository. It only checks whether the companion artifact moved with this diff.
+
+To avoid noise, v0 is designed to suppress findings for cases such as:
+
+- docs-only diffs
+- tests-only diffs
+- generated-file-only diffs
+- example/sample-only diffs where no production contract moved
+- metadata-only renames
+- companion artifacts that moved with concrete companion evidence
+
+## How It Differs
+
+specbackfill is not a general static analyzer, PR comment bot, or team-policy script.
+
+- Semgrep finds code patterns and security/style issues.
+- Danger automates team-specific PR chores.
+- reviewdog reports linter findings on diffs.
+- specbackfill checks whether implementation changes moved with expected companion artifacts in the same diff.
+
+The core finding is not "this code is wrong". The core finding is "this diff changed X, but no companion Y moved with this diff."
+
+## License
+
+[MIT License](./LICENSE)
 
 ## Status
 

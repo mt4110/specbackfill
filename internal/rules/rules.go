@@ -1433,7 +1433,11 @@ func isExamplePath(filePath string) bool {
 	return strings.HasPrefix(lower, "examples/") ||
 		strings.Contains(lower, "/examples/") ||
 		strings.HasPrefix(lower, "example/") ||
-		strings.Contains(lower, "/example/")
+		strings.Contains(lower, "/example/") ||
+		strings.HasPrefix(lower, "samples/") ||
+		strings.Contains(lower, "/samples/") ||
+		strings.HasPrefix(lower, "sample/") ||
+		strings.Contains(lower, "/sample/")
 }
 
 func hasPathSegment(filePath, segment string) bool {
