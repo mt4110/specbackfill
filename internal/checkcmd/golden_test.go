@@ -138,6 +138,8 @@ func TestCrossSourceOutputEquivalence(t *testing.T) {
 			tc.change(t, repo)
 			workingText, workingTextCode, workingTextStderr := runCheckOutput(t, repo, []string{"--format", "text", "--fail-on", "off"})
 			workingJSON, workingJSONCode, workingJSONStderr := runCheckOutput(t, repo, []string{"--format", "json", "--fail-on", "off"})
+			workingMarkdown, workingMarkdownCode, workingMarkdownStderr := runCheckOutput(t, repo, []string{"--format", "markdown", "--fail-on", "off"})
+			workingSummary, workingSummaryCode, workingSummaryStderr := runCheckOutput(t, repo, []string{"--summary", "--fail-on", "off"})
 			workingExplainJSON, workingExplainCode, workingExplainStderr := runCheckOutput(t, repo, []string{"--format", "json", "--fail-on", "off", "--explain"})
 
 			if workingTextCode != 0 || workingTextStderr != "" {
@@ -145,6 +147,12 @@ func TestCrossSourceOutputEquivalence(t *testing.T) {
 			}
 			if workingJSONCode != 0 || workingJSONStderr != "" {
 				t.Fatalf("working json failed: code=%d stderr=%q", workingJSONCode, workingJSONStderr)
+			}
+			if workingMarkdownCode != 0 || workingMarkdownStderr != "" {
+				t.Fatalf("working markdown failed: code=%d stderr=%q", workingMarkdownCode, workingMarkdownStderr)
+			}
+			if workingSummaryCode != 0 || workingSummaryStderr != "" {
+				t.Fatalf("working summary failed: code=%d stderr=%q", workingSummaryCode, workingSummaryStderr)
 			}
 			if workingExplainCode != 0 || workingExplainStderr != "" {
 				t.Fatalf("working explain json failed: code=%d stderr=%q", workingExplainCode, workingExplainStderr)
@@ -155,11 +163,19 @@ func TestCrossSourceOutputEquivalence(t *testing.T) {
 
 			rangeText, rangeTextCode, rangeTextStderr := runCheckOutput(t, repo, []string{"--base", base, "--head", head, "--format", "text", "--fail-on", "off"})
 			rangeJSON, rangeJSONCode, rangeJSONStderr := runCheckOutput(t, repo, []string{"--base", base, "--head", head, "--format", "json", "--fail-on", "off"})
+			rangeMarkdown, rangeMarkdownCode, rangeMarkdownStderr := runCheckOutput(t, repo, []string{"--base", base, "--head", head, "--format", "markdown", "--fail-on", "off"})
+			rangeSummary, rangeSummaryCode, rangeSummaryStderr := runCheckOutput(t, repo, []string{"--base", base, "--head", head, "--summary", "--fail-on", "off"})
 			if rangeTextCode != 0 || rangeTextStderr != "" {
 				t.Fatalf("range text failed: code=%d stderr=%q", rangeTextCode, rangeTextStderr)
 			}
 			if rangeJSONCode != 0 || rangeJSONStderr != "" {
 				t.Fatalf("range json failed: code=%d stderr=%q", rangeJSONCode, rangeJSONStderr)
+			}
+			if rangeMarkdownCode != 0 || rangeMarkdownStderr != "" {
+				t.Fatalf("range markdown failed: code=%d stderr=%q", rangeMarkdownCode, rangeMarkdownStderr)
+			}
+			if rangeSummaryCode != 0 || rangeSummaryStderr != "" {
+				t.Fatalf("range summary failed: code=%d stderr=%q", rangeSummaryCode, rangeSummaryStderr)
 			}
 
 			patchPath := filepath.Join(t.TempDir(), tc.name+".diff")
@@ -167,11 +183,19 @@ func TestCrossSourceOutputEquivalence(t *testing.T) {
 
 			diffText, diffTextCode, diffTextStderr := runCheckOutput(t, repo, []string{"--diff-file", patchPath, "--format", "text", "--fail-on", "off"})
 			diffJSON, diffJSONCode, diffJSONStderr := runCheckOutput(t, repo, []string{"--diff-file", patchPath, "--format", "json", "--fail-on", "off"})
+			diffMarkdown, diffMarkdownCode, diffMarkdownStderr := runCheckOutput(t, repo, []string{"--diff-file", patchPath, "--format", "markdown", "--fail-on", "off"})
+			diffSummary, diffSummaryCode, diffSummaryStderr := runCheckOutput(t, repo, []string{"--diff-file", patchPath, "--summary", "--fail-on", "off"})
 			if diffTextCode != 0 || diffTextStderr != "" {
 				t.Fatalf("diff-file text failed: code=%d stderr=%q", diffTextCode, diffTextStderr)
 			}
 			if diffJSONCode != 0 || diffJSONStderr != "" {
 				t.Fatalf("diff-file json failed: code=%d stderr=%q", diffJSONCode, diffJSONStderr)
+			}
+			if diffMarkdownCode != 0 || diffMarkdownStderr != "" {
+				t.Fatalf("diff-file markdown failed: code=%d stderr=%q", diffMarkdownCode, diffMarkdownStderr)
+			}
+			if diffSummaryCode != 0 || diffSummaryStderr != "" {
+				t.Fatalf("diff-file summary failed: code=%d stderr=%q", diffSummaryCode, diffSummaryStderr)
 			}
 
 			if workingText != rangeText || workingText != diffText {
@@ -179,6 +203,12 @@ func TestCrossSourceOutputEquivalence(t *testing.T) {
 			}
 			if workingJSON != rangeJSON || workingJSON != diffJSON {
 				t.Fatalf("json outputs differ\nworking:\n%s\nrange:\n%s\ndiff-file:\n%s", workingJSON, rangeJSON, diffJSON)
+			}
+			if workingMarkdown != rangeMarkdown || workingMarkdown != diffMarkdown {
+				t.Fatalf("markdown outputs differ\nworking:\n%s\nrange:\n%s\ndiff-file:\n%s", workingMarkdown, rangeMarkdown, diffMarkdown)
+			}
+			if workingSummary != rangeSummary || workingSummary != diffSummary {
+				t.Fatalf("summary outputs differ\nworking:\n%s\nrange:\n%s\ndiff-file:\n%s", workingSummary, rangeSummary, diffSummary)
 			}
 
 			report := decodeReport(t, workingJSON)

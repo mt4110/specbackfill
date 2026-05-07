@@ -24,13 +24,15 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 	var format string
 	var failOn string
 	var includeExplanations bool
+	var summaryOnly bool
 
 	flags.StringVar(&base, "base", "", "base git ref")
 	flags.StringVar(&head, "head", "", "head git ref")
 	flags.StringVar(&diffFile, "diff-file", "", "unified diff file")
-	flags.StringVar(&format, "format", "text", "output format: text|json")
+	flags.StringVar(&format, "format", "text", "output format: text|json|markdown")
 	flags.StringVar(&failOn, "fail-on", "error", "threshold: error|warn|off")
 	flags.BoolVar(&includeExplanations, "explain", false, "include grounded explanations for emitted findings")
+	flags.BoolVar(&summaryOnly, "summary", false, "render summary-only output")
 
 	if err := flags.Parse(args); err != nil {
 		if err == flag.ErrHelp {
@@ -72,7 +74,8 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 		result.Explanations = explain.Build(findings)
 	}
 
-	if err := report.Write(stdout, format, diff, result); err != nil {
+	options := report.Options{SummaryOnly: summaryOnly}
+	if err := report.WriteWithOptions(stdout, format, diff, result, options); err != nil {
 		return writeError(stderr, fmt.Sprintf("render report: %v", err))
 	}
 
@@ -81,7 +84,7 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 
 func validateFlags(base, head, diffFile, format, failOn string) error {
 	switch format {
-	case "text", "json":
+	case "text", "json", "markdown":
 	default:
 		return fmt.Errorf("invalid --format %q", format)
 	}

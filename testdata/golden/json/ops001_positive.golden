@@ -16,6 +16,7 @@
   "findings": [
     {
       "finding_id": "v0-bca6ff75742f0f0c",
+      "omission_signature": "ops001.worker_retry_changed.runbook_observability",
       "rule_id": "OPS001",
       "severity": "warn",
       "confidence": "high",

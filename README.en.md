@@ -12,7 +12,7 @@ It catches the boring review comments teams keep repeating, using only the diff:
 - authz logic changed, but no allow/deny test moved in the same diff
 - worker/retry behavior changed, but no runbook/observability companion moved in the same diff
 
-The current repository contains the `specbackfill check` v0 MVP and verification fixtures for the implemented rules.
+The current repository contains the `specbackfill check` v0 MVP, the `specbackfill rules` command for inspecting implemented rules, the `specbackfill fixtures` command for fixture coverage, and verification fixtures.
 
 This README is the English counterpart to the Japanese primary entry point. The behavioral source of truth is [docs/v0-spec.md](./docs/v0-spec.md), and contributor constraints live in [AGENTS.md](./AGENTS.md).
 
@@ -40,15 +40,33 @@ specbackfill is not `local-ai-review`. specbackfill remains the source of truth 
 
 ```bash
 specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
-                  [--format text|json]
+                  [--format text|json|markdown]
                   [--fail-on error|warn|off]
+                  [--summary]
                   [--explain]
 ```
 
+To inspect the implemented rules:
+
+```bash
+specbackfill rules list
+specbackfill rules show DB001
+```
+
+When developing this repository, inspect fixture coverage for implemented rules from the specbackfill repository root:
+
+```bash
+specbackfill fixtures report
+```
+
 - Inputs: working tree diff / git range diff / unified diff file
-- Outputs: `text` or `json`
+- Outputs: `text`, `json`, or `markdown`
 - Exit codes: `0` no findings, `1` findings at threshold, `2` tool error
+- `--summary`: shows only severity counts and fired rules. It does not change finding evaluation.
 - `--explain`: adds grounded explanations tied to existing findings. It does not add findings.
+- JSON findings include deterministic `finding_id` and `omission_signature` fields.
+- `rules`: shows implemented default v0 rule IDs, severities, intent, and expected companions. It does not evaluate a diff.
+- `fixtures`: shows synthetic fixture coverage by rule. It does not evaluate a diff.
 
 See [docs/v0-spec.md](./docs/v0-spec.md) for the full normative contract and terminology.
 
@@ -113,7 +131,12 @@ mise install
 mise run test
 mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format text --fail-on off
 mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --format json --fail-on off
+mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --format markdown --fail-on off
+mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --summary --fail-on off
 mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format json --fail-on off --explain
+mise exec -- go run ./cmd/specbackfill rules list
+mise exec -- go run ./cmd/specbackfill rules show DB001
+mise exec -- go run ./cmd/specbackfill fixtures report
 ```
 
 ## Implemented Rules
@@ -126,6 +149,16 @@ mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/db001_
 - `ERR001`: Public error/status/code contract changed, no assertion test moved
 - `OPS001`: Worker/queue/retry behavior changed, no observability/runbook moved
 - `DOC001`: Generated spec changed, no hand-written explanation moved
+
+## Fixture Coverage
+
+specbackfill is tested against positive, companion-present, negative, and edge synthetic diff fixtures. When developing this repository, current coverage is visible with:
+
+```bash
+specbackfill fixtures report
+```
+
+The goal is not to maximize rule count. The goal is to keep findings quiet and evidence-backed.
 
 ## What It Does Not Claim
 

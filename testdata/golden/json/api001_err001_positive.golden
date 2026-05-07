@@ -16,6 +16,7 @@
   "findings": [
     {
       "finding_id": "v0-f2197be9363c1000",
+      "omission_signature": "api001.public_api_changed.contract_docs",
       "rule_id": "API001",
       "severity": "warn",
       "confidence": "high",
@@ -49,6 +50,7 @@
     },
     {
       "finding_id": "v0-cd332cad68d123fd",
+      "omission_signature": "err001.error_contract_changed.assertion_docs",
       "rule_id": "ERR001",
       "severity": "warn",
       "confidence": "high",

@@ -12,7 +12,7 @@ specbackfill は、コード差分から **companion artifacts** の追従漏れ
 - authz 分岐を変えたけど allow/deny test が同じ diff にない
 - worker/retry を変えたけど runbook/observability が同じ diff にない
 
-現状の repository には、`specbackfill check` の v0 MVP と実装済みルールの検証 fixture が入っています。
+現状の repository には、`specbackfill check` の v0 MVP、実装済みルールを確認する `specbackfill rules` コマンド、fixture coverage を見る `specbackfill fixtures` コマンド、検証 fixture が入っています。
 
 この README は日本語の主入口です。挙動の正本は [docs/v0-spec.md](./docs/v0-spec.md)、変更時の制約は [AGENTS.md](./AGENTS.md) にあります。
 
@@ -40,15 +40,33 @@ specbackfill は `local-ai-review` とは別物です。deterministic な rule I
 
 ```bash
 specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
-                  [--format text|json]
+                  [--format text|json|markdown]
                   [--fail-on error|warn|off]
+                  [--summary]
                   [--explain]
 ```
 
+実装済みルールを確認する場合は、次のコマンドを使います。
+
+```bash
+specbackfill rules list
+specbackfill rules show DB001
+```
+
+この repository の開発中に実装済みルールの fixture coverage を確認する場合は、specbackfill repository root で次を実行します。
+
+```bash
+specbackfill fixtures report
+```
+
 - 入力: working tree diff / git range diff / unified diff file
-- 出力: `text` または `json`
+- 出力: `text`、`json`、`markdown`
 - 終了コード: `0` no findings, `1` findings at threshold, `2` tool error
+- `--summary`: severity counts と fired rules だけを表示します。finding 判定は変えません。
 - `--explain`: 既存 finding に紐づく grounded explanation を追加します。finding 自体は増やしません。
+- JSON findings には deterministic な `finding_id` と `omission_signature` が入ります。
+- `rules`: 実装済み default v0 rule の ID、severity、意図、expected companions を表示します。diff は評価しません。
+- `fixtures`: synthetic fixture coverage を rule ごとに表示します。diff は評価しません。
 
 仕様の詳細と用語の正本は [docs/v0-spec.md](./docs/v0-spec.md) を見てください。
 
@@ -113,7 +131,12 @@ mise install
 mise run test
 mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format text --fail-on off
 mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --format json --fail-on off
+mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --format markdown --fail-on off
+mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --summary --fail-on off
 mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format json --fail-on off --explain
+mise exec -- go run ./cmd/specbackfill rules list
+mise exec -- go run ./cmd/specbackfill rules show DB001
+mise exec -- go run ./cmd/specbackfill fixtures report
 ```
 
 ## 実装済みルール
@@ -126,6 +149,16 @@ mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/db001_
 - `ERR001`: Public error/status/code contract changed, no assertion test moved
 - `OPS001`: Worker/queue/retry behavior changed, no observability/runbook moved
 - `DOC001`: Generated spec changed, no hand-written explanation moved
+
+## Fixture coverage
+
+specbackfill は positive、companion-present、negative、edge の synthetic diff fixtures で検証しています。この repository の開発中は、現在の coverage を次で確認できます。
+
+```bash
+specbackfill fixtures report
+```
+
+目的はルール数を増やすことではなく、evidence-backed な finding を静かに保つことです。
 
 ## 検出しない・主張しないこと
 

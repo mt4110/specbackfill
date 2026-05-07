@@ -16,6 +16,7 @@
   "findings": [
     {
       "finding_id": "v0-515a10748ab1ffd3",
+      "omission_signature": "cfg001.config_introduced.docs_default",
       "rule_id": "CFG001",
       "severity": "warn",
       "confidence": "high",

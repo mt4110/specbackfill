@@ -92,12 +92,52 @@ rules while `specbackfill` remains the active rule-engine source of truth.
 
 ```bash
 specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
-                  [--format text|json]
+                  [--format text|json|markdown]
                   [--fail-on error|warn|off]
+                  [--summary]
                   [--explain]
 ```
 
-### 4.2 Input sources
+### 4.2 Rule discovery commands
+
+v0 MUST support the following rule discovery commands:
+
+```bash
+specbackfill rules list
+specbackfill rules show <RULE_ID>
+```
+
+The `rules` command group shows implemented default v0 rule metadata. It MUST
+NOT inspect a diff, emit findings, call network services, invoke AI, or change
+`specbackfill check` behavior.
+
+`rules list` SHOULD show implemented rule IDs, default severities, and concise
+descriptions.
+
+`rules show <RULE_ID>` SHOULD show the rule title, default severity, typical
+triggers, expected companions, and common non-reporting cases.
+
+The `rules` command group returns exit code `0` on success and exit code `2`
+for invalid arguments, unknown rule IDs, or tool errors. It MUST NOT return
+exit code `1` because it does not evaluate findings.
+
+### 4.3 Fixture visibility command
+
+v0 MAY support the following repository-maintainer command:
+
+```bash
+specbackfill fixtures report
+```
+
+The `fixtures` command group reports synthetic fixture coverage for the
+implemented default v0 rules. It is a trust and contributor aid. It MUST NOT
+emit findings, inspect PR metadata, call network services, invoke AI, or change
+`specbackfill check` behavior.
+
+`fixtures report` SHOULD show positive, companion-present, negative, and edge
+fixture counts by rule.
+
+### 4.4 Input sources
 
 | Input source | When used | Requirement |
 | --- | --- | --- |
@@ -107,7 +147,7 @@ specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
 
 The implementation MAY reject invalid combinations of input flags as tool errors.
 
-### 4.3 Output formats
+### 4.5 Output formats
 
 v0 MUST support the following formats:
 
@@ -115,10 +155,15 @@ v0 MUST support the following formats:
 | --- | --- |
 | `text` | human-oriented |
 | `json` | CI and downstream processing |
+| `markdown` | human-oriented Markdown output for logs, copied reports, or downstream posting by another tool |
 
 `--explain` MAY add grounded explanations for existing findings. It MUST NOT create findings, change rule evaluation, or make the core command depend on AI availability.
 
-### 4.4 Severity threshold
+`--summary` MAY render summary-only output for the selected format. Summary mode
+MUST NOT change rule evaluation, finding identity, or exit-code threshold
+behavior.
+
+### 4.6 Severity threshold
 
 v0 MUST support the following `--fail-on` modes:
 
@@ -130,7 +175,7 @@ v0 MUST support the following `--fail-on` modes:
 
 `info` findings MUST NOT cause exit code `1`.
 
-### 4.5 Exit codes
+### 4.7 Exit codes
 
 The command MUST return:
 
@@ -148,7 +193,7 @@ Tool errors include, but are not limited to:
 - git invocation failures for local/git-range diff acquisition
 - unexpected internal failures
 
-### 4.6 CI usage
+### 4.8 CI usage
 
 CI systems SHOULD invoke the same `specbackfill check` CLI contract used locally.
 
@@ -157,7 +202,9 @@ For pull-request style checks, CI SHOULD either:
 - provide both refs to `--base <ref> --head <ref>`, ensuring both commits are available in the local checkout
 - provide a unified diff through `--diff-file <file>`
 
-`text` output is appropriate for human-readable CI logs. `json` output is for CI and downstream processing.
+`text` output is appropriate for human-readable CI logs. `markdown` output is
+appropriate when another tool will copy or post the report. `json` output is
+for CI and downstream processing.
 
 `--fail-on` controls only whether findings cause exit code `1`; tool errors still cause exit code `2`.
 
@@ -292,6 +339,22 @@ evidence, and expected companion categories.
 Downstream tools MAY store or compare `finding_id`, but MUST still preserve the
 required finding fields.
 
+### 7.7 Omission signatures
+
+v0 findings include an `omission_signature`.
+
+`omission_signature` MUST be a deterministic grouping key for the same class of
+companion-artifact omission. It is less specific than `finding_id`: multiple
+findings may share the same omission signature when they belong to the same
+rule-level omission class.
+
+`omission_signature` MUST NOT replace `rule_id`, `finding_id`, evidence, or
+expected companion categories. It MUST NOT depend on AI explanations, downstream
+verdicts, PR metadata, network calls, wall-clock time, or random values.
+
+Downstream tools MAY use `omission_signature` for aggregation, fixture gap
+analysis, or false-positive clustering. It MUST NOT change runtime detection.
+
 ## 8. Output Semantics
 
 Human-readable output MUST preserve diff-local wording.
@@ -355,6 +418,7 @@ Recommended structure:
   "findings": [
     {
       "finding_id": "v0-74e68b9cb49588c2",
+      "omission_signature": "db001.schema_changed.migration_companion",
       "rule_id": "DB001",
       "severity": "error",
       "confidence": "high",
@@ -390,6 +454,54 @@ When `--explain` is enabled, JSON output MAY include an additive top-level `expl
 - `expected_companions`
 
 The `findings` array remains the deterministic machine contract. Explanations MUST preserve rule IDs, evidence references, and expected companion categories.
+
+### 8.3 Markdown output
+
+`markdown` output SHOULD contain the same finding semantics as `text` output in
+a Markdown-friendly shape. It MUST preserve rule IDs, severities, why text,
+evidence, expected companion categories, and diff-local wording.
+
+Recommended shape:
+
+```md
+### specbackfill findings
+
+- Changed files: 2
+- Findings: error=0 warn=1 info=0
+
+#### [warn] API001 Public API changed, but no matching contract-test/docs companion moved with this diff
+
+An explicit API spec file moved in the diff, but no matching contract-test/docs companion evidence moved with it.
+
+Evidence:
+- `openapi.yaml`: `+ /users:`
+
+Expected companions:
+- contract test
+- API docs
+- compatibility or deprecation note
+```
+
+### 8.4 Summary output
+
+When `--summary` is enabled, output SHOULD focus on changed file count,
+severity counts, and rule counts. It MUST NOT change finding evaluation or exit
+behavior.
+
+Recommended text shape:
+
+```text
+specbackfill summary
+changed files: 2
+
+error: 0
+warn:  2
+info:  0
+
+Rules fired:
+- API001: 1
+- ERR001: 1
+```
 
 ## 9. Default v0 Rule Pack
 
@@ -673,11 +785,15 @@ A conforming v0 implementation of `specbackfill` MUST:
 3. optionally derive repo profile markers
 4. evaluate deterministic rules over the diff
 5. emit only evidence-backed, diff-local findings
-6. support `text` and `json` output
+6. support `text`, `json`, and `markdown` output
 7. honor `--fail-on error|warn|off`
 8. preserve exit codes `0`, `1`, and `2` as defined above
 9. avoid repository-wide claims not supported by the diff
-10. remain phase-limited and conservative in scope
+10. support rule discovery commands for the implemented default v0 rules
+11. support summary-only output without changing rule evaluation
+12. support fixture coverage visibility for repository maintainers
+13. include deterministic omission signatures for emitted findings
+14. remain phase-limited and conservative in scope
 
 The quality bar for this product is not breadth.
 It is **precision, explicitness, and honesty about what the diff can actually support**.

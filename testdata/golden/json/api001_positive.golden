@@ -16,6 +16,7 @@
   "findings": [
     {
       "finding_id": "v0-f2197be9363c1000",
+      "omission_signature": "api001.public_api_changed.contract_docs",
       "rule_id": "API001",
       "severity": "warn",
       "confidence": "high",
