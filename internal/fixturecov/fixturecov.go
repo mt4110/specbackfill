@@ -64,30 +64,34 @@ func classifyFixture(filename string) ([]string, string) {
 	tokens := strings.Split(base, "_")
 
 	ruleIDs := make([]string, 0, 2)
-	index := 0
-	for index < len(tokens) {
-		ruleID, ok := canonicalRuleToken(tokens[index])
+	seenRuleIDs := map[string]struct{}{}
+	categoryTokens := make([]string, 0, len(tokens))
+	for _, token := range tokens {
+		ruleID, ok := canonicalRuleToken(token)
 		if !ok {
-			break
+			categoryTokens = append(categoryTokens, token)
+			continue
+		}
+		if _, seen := seenRuleIDs[ruleID]; seen {
+			continue
 		}
 		ruleIDs = append(ruleIDs, ruleID)
-		index++
+		seenRuleIDs[ruleID] = struct{}{}
 	}
 	if len(ruleIDs) == 0 {
 		return nil, "edge"
 	}
 
-	rest := tokens[index:]
 	switch {
-	case hasAny(rest, "deleted", "removed", "unrelated", "metadata", "ambiguous"):
+	case hasAny(categoryTokens, "deleted", "removed", "unrelated", "metadata", "ambiguous"):
 		return ruleIDs, "edge"
-	case hasAny(rest, "companion"):
+	case hasAny(categoryTokens, "companion"):
 		return ruleIDs, "companion"
-	case hasAny(rest, "positive"):
+	case hasAny(categoryTokens, "positive"):
 		return ruleIDs, "positive"
-	case hasAny(rest, "negative"):
+	case hasAny(categoryTokens, "negative"):
 		return ruleIDs, "negative"
-	case hasOnlyCategory(rest):
+	case hasOnlyCategory(categoryTokens):
 		return ruleIDs, "negative"
 	default:
 		return ruleIDs, "edge"
