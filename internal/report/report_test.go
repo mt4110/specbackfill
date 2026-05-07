@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/mt4110/specbackfill/internal/model"
+	"github.com/mt4110/specbackfill/internal/rules"
 )
 
 func TestWriteTextSkeleton(t *testing.T) {
@@ -255,6 +256,56 @@ func TestBuildOverwritesGeneratedFindingMetadata(t *testing.T) {
 	}
 	if got := result.Findings[0].OmissionSignature; got != "cfg001.config_introduced.docs_default" {
 		t.Fatalf("OmissionSignature = %q, want generated CFG001 signature", got)
+	}
+}
+
+func TestBuildAddsOmissionSignatureForEveryCatalogRule(t *testing.T) {
+	t.Parallel()
+
+	for _, info := range rules.Catalog() {
+		info := info
+		t.Run(info.ID, func(t *testing.T) {
+			t.Parallel()
+
+			result := Build(model.RepoProfile{}, []model.Finding{{
+				RuleID:             info.ID,
+				Severity:           info.DefaultSeverity,
+				Evidence:           []model.Evidence{{File: "file.go", Kind: string(model.LineKindAdded), Excerpt: "changed line"}},
+				ExpectedCompanions: []string{"companion"},
+			}})
+
+			signature := result.Findings[0].OmissionSignature
+			if signature == "" {
+				t.Fatalf("%s OmissionSignature is empty", info.ID)
+			}
+			if strings.HasSuffix(signature, ".unmapped") {
+				t.Fatalf("%s OmissionSignature = %q, want explicit mapped signature", info.ID, signature)
+			}
+		})
+	}
+}
+
+func TestBuildAddsDeterministicOmissionSignatureFallback(t *testing.T) {
+	t.Parallel()
+
+	result := Build(model.RepoProfile{}, []model.Finding{{
+		RuleID:             "NEW999",
+		Severity:           model.SeverityInfo,
+		Evidence:           []model.Evidence{{File: "file.go", Kind: string(model.LineKindAdded), Excerpt: "changed line"}},
+		ExpectedCompanions: []string{"companion"},
+	}})
+
+	if got := result.Findings[0].OmissionSignature; got != "new999.unmapped" {
+		t.Fatalf("OmissionSignature = %q, want deterministic fallback", got)
+	}
+
+	emptyRuleResult := Build(model.RepoProfile{}, []model.Finding{{
+		Severity:           model.SeverityInfo,
+		Evidence:           []model.Evidence{{File: "file.go", Kind: string(model.LineKindAdded), Excerpt: "changed line"}},
+		ExpectedCompanions: []string{"companion"},
+	}})
+	if got := emptyRuleResult.Findings[0].OmissionSignature; got != "unknown.rule_id.unmapped" {
+		t.Fatalf("empty-rule OmissionSignature = %q, want unknown fallback", got)
 	}
 }
 

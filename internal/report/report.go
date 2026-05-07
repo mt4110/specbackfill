@@ -58,7 +58,11 @@ func omissionSignature(ruleID string) string {
 	case "DOC001":
 		return "doc001.generated_spec_changed.human_explanation"
 	default:
-		return ""
+		normalizedRuleID := strings.ToLower(strings.TrimSpace(ruleID))
+		if normalizedRuleID == "" {
+			return "unknown.rule_id.unmapped"
+		}
+		return normalizedRuleID + ".unmapped"
 	}
 }
 

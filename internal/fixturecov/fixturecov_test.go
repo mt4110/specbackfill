@@ -41,6 +41,8 @@ func TestClassifyFixture(t *testing.T) {
 		{name: "api001_unrelated_docs.diff", wantRuleIDs: []string{"API001"}, wantCategory: "edge"},
 		{name: "cfg001_negative_samples_only.diff", wantRuleIDs: []string{"CFG001"}, wantCategory: "negative"},
 		{name: "db001_migration_only.diff", wantRuleIDs: []string{"DB001"}, wantCategory: "negative"},
+		{name: "db001_docs_samples_only.diff", wantRuleIDs: []string{"DB001"}, wantCategory: "negative"},
+		{name: "db001_docs_garbage_only.diff", wantRuleIDs: []string{"DB001"}, wantCategory: "edge"},
 	}
 
 	for _, tc := range cases {

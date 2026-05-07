@@ -70,7 +70,7 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 
 	findings := rules.Evaluate(diff, repoProfile)
 	result := report.Build(repoProfile, findings)
-	if includeExplanations {
+	if includeExplanations && !summaryOnly {
 		result.Explanations = explain.Build(findings)
 	}
 

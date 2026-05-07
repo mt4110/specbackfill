@@ -149,6 +149,23 @@ func TestRunDiffFileSummary(t *testing.T) {
 	}
 }
 
+func TestRunDiffFileSummaryWithExplainMatchesSummary(t *testing.T) {
+	t.Parallel()
+
+	fixture := writeFixtureCopy(t, "api001_err001_positive.diff")
+	summary, summaryStderr, summaryCode := runCheckText(t, t.TempDir(), []string{"--diff-file", fixture, "--format", "text", "--summary", "--fail-on", "off"})
+	explainedSummary, explainedSummaryStderr, explainedSummaryCode := runCheckText(t, t.TempDir(), []string{"--diff-file", fixture, "--format", "text", "--summary", "--explain", "--fail-on", "off"})
+	if summaryCode != 0 || explainedSummaryCode != 0 {
+		t.Fatalf("Run() codes summary=%d explained=%d; stderr summary=%q explained=%q", summaryCode, explainedSummaryCode, summaryStderr, explainedSummaryStderr)
+	}
+	if summaryStderr != "" || explainedSummaryStderr != "" {
+		t.Fatalf("unexpected stderr summary=%q explained=%q", summaryStderr, explainedSummaryStderr)
+	}
+	if explainedSummary != summary {
+		t.Fatalf("summary output changed with --explain\nsummary:\n%s\nexplained:\n%s", summary, explainedSummary)
+	}
+}
+
 func TestRunDiffFileJSONWithExplain(t *testing.T) {
 	t.Parallel()
 

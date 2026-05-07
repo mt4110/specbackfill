@@ -124,8 +124,10 @@ func hasOnlyCategory(tokens []string) bool {
 	for _, token := range tokens[:len(tokens)-1] {
 		switch token {
 		case "docs", "tests", "generated", "examples", "samples", "migration":
-			return true
+			continue
+		default:
+			return false
 		}
 	}
-	return false
+	return true
 }
