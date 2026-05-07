@@ -49,6 +49,7 @@ func TestEvaluateFixtures(t *testing.T) {
 		{name: "cfg001 nested examples only negative", file: "cfg001_negative_nested_examples_only.diff", want: nil},
 		{name: "cfg001 samples only negative", file: "cfg001_negative_samples_only.diff", want: nil},
 		{name: "cfg001 sample named production positive", file: "cfg001_sample_named_production_positive.diff", want: []string{"CFG001"}},
+		{name: "cfg001 sample dir production positive", file: "cfg001_sample_dir_production_positive.diff", want: []string{"CFG001"}},
 		{name: "cfg001 metadata-only rename negative", file: "cfg001_metadata_rename.diff", want: nil},
 		{name: "api001 positive", file: "api001_positive.diff", want: []string{"API001"}},
 		{name: "api001 and err001 composite", file: "api001_err001_positive.diff", want: []string{"API001", "ERR001"}},
@@ -227,15 +228,15 @@ func TestMetadataOnlyCompanionMoveSuppressesFinding(t *testing.T) {
 	}
 }
 
-func TestExamplePathIncludesSampleSegmentsOnly(t *testing.T) {
+func TestExamplePathTreatsSampleAsTopLevelOnly(t *testing.T) {
 	t.Parallel()
 
-	for _, path := range []string{"sample/config.go", "samples/config.go", "cmd/tool/sample/config.go", "cmd/tool/samples/config.go"} {
+	for _, path := range []string{"sample/config.go", "samples/config.go", "cmd/tool/example/config.go", "cmd/tool/examples/config.go"} {
 		if !isExamplePath(path) {
 			t.Fatalf("isExamplePath(%q) = false, want true", path)
 		}
 	}
-	for _, path := range []string{"internal/config/sample_loader.go", "internal/sampler/config.go"} {
+	for _, path := range []string{"internal/sample/config.go", "cmd/tool/sample/config.go", "cmd/tool/samples/config.go", "internal/config/sample_loader.go", "internal/sampler/config.go"} {
 		if isExamplePath(path) {
 			t.Fatalf("isExamplePath(%q) = true, want false", path)
 		}

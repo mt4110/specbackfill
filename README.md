@@ -169,7 +169,7 @@ specbackfill は「repo に何かが存在しない」とは言いません。�
 - docs-only diffs
 - tests-only diffs
 - generated-file-only diffs
-- example/sample-only diffs where no production contract moved
+- example-only or top-level sample-only diffs where no production contract moved
 - metadata-only renames
 - companion artifacts that moved with concrete companion evidence
 

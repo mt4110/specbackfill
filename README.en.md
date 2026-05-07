@@ -169,7 +169,7 @@ To avoid noise, v0 is designed to suppress findings for cases such as:
 - docs-only diffs
 - tests-only diffs
 - generated-file-only diffs
-- example/sample-only diffs where no production contract moved
+- example-only or top-level sample-only diffs where no production contract moved
 - metadata-only renames
 - companion artifacts that moved with concrete companion evidence
 

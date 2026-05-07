@@ -730,7 +730,7 @@ The implementation SHOULD avoid noisy findings for cases such as:
 - generated-file-only diffs
 - docs-only diffs
 - tests-only diffs
-- example/sample-only diffs where no production contract moved
+- example-only or top-level sample-only diffs where no production contract moved
 - migration-only diffs that already represent the expected companion movement
 
 ### 10.3 Repo markers are narrowing hints

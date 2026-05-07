@@ -1430,14 +1430,14 @@ func isGeneratedPath(filePath string) bool {
 
 func isExamplePath(filePath string) bool {
 	lower := strings.ToLower(filePath)
-	return strings.HasPrefix(lower, "examples/") ||
-		strings.Contains(lower, "/examples/") ||
-		strings.HasPrefix(lower, "example/") ||
-		strings.Contains(lower, "/example/") ||
-		strings.HasPrefix(lower, "samples/") ||
-		strings.Contains(lower, "/samples/") ||
-		strings.HasPrefix(lower, "sample/") ||
-		strings.Contains(lower, "/sample/")
+	return hasPathSegment(lower, "examples") ||
+		hasPathSegment(lower, "example") ||
+		hasTopLevelPathSegment(lower, "samples") ||
+		hasTopLevelPathSegment(lower, "sample")
+}
+
+func hasTopLevelPathSegment(filePath, segment string) bool {
+	return filePath == segment || strings.HasPrefix(filePath, segment+"/")
 }
 
 func hasPathSegment(filePath, segment string) bool {
