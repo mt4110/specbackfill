@@ -16,6 +16,7 @@
   "findings": [
     {
       "finding_id": "v0-ed3e56cebd804525",
+      "omission_signature": "auth001.authz_changed.allow_deny",
       "rule_id": "AUTH001",
       "severity": "warn",
       "confidence": "high",

@@ -1,0 +1,7 @@
+--- a/samples/http/errors.go
++++ b/samples/http/errors.go
+@@ -1,3 +1,3 @@
+ func statusCode() int {
+-  return http.StatusBadRequest
++  return http.StatusUnprocessableEntity
+ }

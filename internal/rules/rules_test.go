@@ -47,6 +47,9 @@ func TestEvaluateFixtures(t *testing.T) {
 		{name: "cfg001 tests only negative", file: "cfg001_negative_tests_only.diff", want: nil},
 		{name: "cfg001 examples only negative", file: "cfg001_negative_examples_only.diff", want: nil},
 		{name: "cfg001 nested examples only negative", file: "cfg001_negative_nested_examples_only.diff", want: nil},
+		{name: "cfg001 samples only negative", file: "cfg001_negative_samples_only.diff", want: nil},
+		{name: "cfg001 sample named production positive", file: "cfg001_sample_named_production_positive.diff", want: []string{"CFG001"}},
+		{name: "cfg001 sample dir production positive", file: "cfg001_sample_dir_production_positive.diff", want: []string{"CFG001"}},
 		{name: "cfg001 metadata-only rename negative", file: "cfg001_metadata_rename.diff", want: nil},
 		{name: "api001 positive", file: "api001_positive.diff", want: []string{"API001"}},
 		{name: "api001 and err001 composite", file: "api001_err001_positive.diff", want: []string{"API001", "ERR001"}},
@@ -57,6 +60,7 @@ func TestEvaluateFixtures(t *testing.T) {
 		{name: "api001 generated openapi routes to doc001 only", file: "api001_generated_openapi_routes_to_doc001.diff", want: []string{"DOC001"}},
 		{name: "api001 tests only negative", file: "api001_negative_tests_only.diff", want: nil},
 		{name: "api001 examples only negative", file: "api001_negative_examples_only.diff", want: nil},
+		{name: "api001 samples only negative", file: "api001_negative_samples_only.diff", want: nil},
 		{name: "api001 metadata-only rename negative", file: "api001_metadata_rename.diff", want: nil},
 		{name: "auth001 positive", file: "auth001_positive.diff", want: []string{"AUTH001"}},
 		{name: "auth001 middleware positive", file: "auth001_middleware_positive.diff", want: []string{"AUTH001"}},
@@ -73,6 +77,7 @@ func TestEvaluateFixtures(t *testing.T) {
 		{name: "auth001 security code unrelated companion", file: "auth001_security_code_unrelated.diff", want: []string{"AUTH001"}},
 		{name: "auth001 unrelated 200 with deny still warns", file: "auth001_unrelated_200_with_deny.diff", want: []string{"AUTH001"}},
 		{name: "auth001 examples only negative", file: "auth001_negative_examples_only.diff", want: nil},
+		{name: "auth001 samples only negative", file: "auth001_negative_samples_only.diff", want: nil},
 		{name: "auth001 non-auth path negative", file: "auth001_negative_non_auth_path.diff", want: nil},
 		{name: "auth001 generated only negative", file: "auth001_negative_generated_only.diff", want: nil},
 		{name: "auth001 tests only negative", file: "auth001_negative_tests_only.diff", want: nil},
@@ -88,6 +93,7 @@ func TestEvaluateFixtures(t *testing.T) {
 		{name: "err001 generated only negative", file: "err001_negative_generated_only.diff", want: nil},
 		{name: "err001 tests only negative", file: "err001_negative_tests_only.diff", want: nil},
 		{name: "err001 examples only negative", file: "err001_negative_examples_only.diff", want: nil},
+		{name: "err001 samples only negative", file: "err001_negative_samples_only.diff", want: nil},
 		{name: "err001 metadata-only rename negative", file: "err001_metadata_rename.diff", want: nil},
 		{name: "ops001 positive", file: "ops001_positive.diff", want: []string{"OPS001"}},
 		{name: "ops001 ops path positive", file: "ops001_ops_path_positive.diff", want: []string{"OPS001"}},
@@ -109,6 +115,7 @@ func TestEvaluateFixtures(t *testing.T) {
 		{name: "ops001 docs only negative", file: "ops001_negative_docs_only.diff", want: nil},
 		{name: "ops001 tests only negative", file: "ops001_negative_tests_only.diff", want: nil},
 		{name: "ops001 examples only negative", file: "ops001_negative_examples_only.diff", want: nil},
+		{name: "ops001 samples only negative", file: "ops001_negative_samples_only.diff", want: nil},
 		{name: "ops001 metadata-only rename negative", file: "ops001_metadata_rename.diff", want: nil},
 		{name: "doc001 positive", file: "doc001_positive.diff", want: []string{"DOC001"}},
 		{name: "doc001 companion satisfied", file: "doc001_companion.diff", want: nil},
@@ -119,6 +126,7 @@ func TestEvaluateFixtures(t *testing.T) {
 		{name: "doc001 generated docs only negative", file: "doc001_negative_docs_only.diff", want: nil},
 		{name: "doc001 generated tests only negative", file: "doc001_negative_tests_only.diff", want: nil},
 		{name: "doc001 generated examples only negative", file: "doc001_negative_examples_only.diff", want: nil},
+		{name: "doc001 generated samples only negative", file: "doc001_negative_samples_only.diff", want: nil},
 		{name: "doc001 metadata-only rename negative", file: "doc001_metadata_rename.diff", want: nil},
 	}
 
@@ -217,6 +225,21 @@ func TestMetadataOnlyCompanionMoveSuppressesFinding(t *testing.T) {
 
 	if got := ruleIDs(Evaluate(diff, model.RepoProfile{})); len(got) != 0 {
 		t.Fatalf("ruleIDs = %v, want no findings", got)
+	}
+}
+
+func TestExamplePathTreatsSampleAsTopLevelOnly(t *testing.T) {
+	t.Parallel()
+
+	for _, path := range []string{"sample/config.go", "samples/config.go", "cmd/tool/example/config.go", "cmd/tool/examples/config.go"} {
+		if !isExamplePath(path) {
+			t.Fatalf("isExamplePath(%q) = false, want true", path)
+		}
+	}
+	for _, path := range []string{"internal/sample/config.go", "cmd/tool/sample/config.go", "cmd/tool/samples/config.go", "internal/config/sample_loader.go", "internal/sampler/config.go"} {
+		if isExamplePath(path) {
+			t.Fatalf("isExamplePath(%q) = true, want false", path)
+		}
 	}
 }
 

@@ -101,6 +101,71 @@ func TestRunDiffFileJSON(t *testing.T) {
 	}
 }
 
+func TestRunDiffFileMarkdown(t *testing.T) {
+	t.Parallel()
+
+	fixture := writeFixtureCopy(t, "db001_positive.diff")
+	stdout, stderr, code := runCheckText(t, t.TempDir(), []string{"--diff-file", fixture, "--format", "markdown", "--fail-on", "off"})
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr=%q", code, stderr)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if !strings.Contains(stdout, "### specbackfill findings") {
+		t.Fatalf("markdown output missing heading:\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "#### [error] DB001") {
+		t.Fatalf("markdown output missing DB001 finding:\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "`schema.prisma`: `+ email String @unique`") {
+		t.Fatalf("markdown output missing evidence:\n%s", stdout)
+	}
+}
+
+func TestRunDiffFileSummary(t *testing.T) {
+	t.Parallel()
+
+	fixture := writeFixtureCopy(t, "api001_err001_positive.diff")
+	stdout, stderr, code := runCheckText(t, t.TempDir(), []string{"--diff-file", fixture, "--format", "text", "--summary", "--fail-on", "off"})
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr=%q", code, stderr)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	for _, want := range []string{
+		"specbackfill summary",
+		"warn:  2",
+		"- API001: 1",
+		"- ERR001: 1",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("summary output missing %q:\n%s", want, stdout)
+		}
+	}
+	if strings.Contains(stdout, "expected companions:") {
+		t.Fatalf("summary output included finding details:\n%s", stdout)
+	}
+}
+
+func TestRunDiffFileSummaryWithExplainMatchesSummary(t *testing.T) {
+	t.Parallel()
+
+	fixture := writeFixtureCopy(t, "api001_err001_positive.diff")
+	summary, summaryStderr, summaryCode := runCheckText(t, t.TempDir(), []string{"--diff-file", fixture, "--format", "text", "--summary", "--fail-on", "off"})
+	explainedSummary, explainedSummaryStderr, explainedSummaryCode := runCheckText(t, t.TempDir(), []string{"--diff-file", fixture, "--format", "text", "--summary", "--explain", "--fail-on", "off"})
+	if summaryCode != 0 || explainedSummaryCode != 0 {
+		t.Fatalf("Run() codes summary=%d explained=%d; stderr summary=%q explained=%q", summaryCode, explainedSummaryCode, summaryStderr, explainedSummaryStderr)
+	}
+	if summaryStderr != "" || explainedSummaryStderr != "" {
+		t.Fatalf("unexpected stderr summary=%q explained=%q", summaryStderr, explainedSummaryStderr)
+	}
+	if explainedSummary != summary {
+		t.Fatalf("summary output changed with --explain\nsummary:\n%s\nexplained:\n%s", summary, explainedSummary)
+	}
+}
+
 func TestRunDiffFileJSONWithExplain(t *testing.T) {
 	t.Parallel()
 

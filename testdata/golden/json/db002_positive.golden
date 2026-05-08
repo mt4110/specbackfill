@@ -16,6 +16,7 @@
   "findings": [
     {
       "finding_id": "v0-0589db7b008ded3f",
+      "omission_signature": "db002.destructive_storage.rollback_backfill",
       "rule_id": "DB002",
       "severity": "warn",
       "confidence": "high",

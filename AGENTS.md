@@ -103,8 +103,9 @@ Unless a task explicitly changes it, preserve this contract:
 
 ```bash
 specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
-                  [--format text|json]
+                  [--format text|json|markdown]
                   [--fail-on error|warn|off]
+                  [--summary]
 ```
 
 Exit codes:
@@ -141,7 +142,30 @@ When adding or changing a rule:
 Prefer multiple signals such as path match, hunk keyword match, and companion absence within touched files.
 Do not emit broad findings from path names alone unless the phase explicitly allows it.
 
-## 10. Change discipline
+## 10. Rule promotion gate
+
+A rule, suppression, companion-recognition change, or default severity change can be promoted only if it satisfies all of the following:
+
+1. It preserves diff-local wording.
+2. It has concrete diff evidence for every emitted finding.
+3. It does not claim repository-wide absence.
+4. It has at least one positive fixture when detection changes.
+5. It has at least one nearby negative fixture when noise behavior changes.
+6. It has at least one companion-present fixture when companion suppression changes.
+7. It does not require AI, PR metadata, network calls, external services, or repository mutation.
+8. It does not remove stable JSON fields or required finding fields.
+9. It improves or preserves fixture coverage and report stability.
+
+Before merging a rule change, reviewers should ask:
+
+- Does the rule only inspect the current diff?
+- Does every finding have concrete evidence?
+- Are generated/docs/tests/example/sample-only negatives covered when relevant?
+- Is companion-present suppression tested?
+- Does JSON output remain stable or change only for an intentional contract update?
+- Does text output remain conservative and understandable?
+
+## 11. Change discipline
 
 - Prefer the simplest implementation that satisfies the current task.
 - Preserve existing behavior unless the task explicitly changes it.
@@ -151,7 +175,7 @@ Do not emit broad findings from path names alone unless the phase explicitly all
 The fastest way to damage this product is to make it sound smarter than it is.
 Be narrow, explicit, and evidence-first.
 
-## 11. `.private_docs` local design contract
+## 12. `.private_docs` local design contract
 
 If `.private_docs/` exists, treat it as local design context. It is intentionally ignored and should not be mixed into the public PR surface.
 

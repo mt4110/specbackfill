@@ -1,0 +1,6 @@
+--- a/internal/config/sample_loader.go
++++ b/internal/config/sample_loader.go
+@@ -1,2 +1,3 @@
+ func load() {
++  token := os.Getenv("NEW_API_TOKEN")
+ }

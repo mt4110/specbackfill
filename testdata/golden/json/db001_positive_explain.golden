@@ -16,6 +16,7 @@
   "findings": [
     {
       "finding_id": "v0-3e8fca4b2cdb678b",
+      "omission_signature": "db001.schema_changed.migration_companion",
       "rule_id": "DB001",
       "severity": "error",
       "confidence": "high",

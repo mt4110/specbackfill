@@ -16,6 +16,7 @@
   "findings": [
     {
       "finding_id": "v0-0b2f12e0d255c87f",
+      "omission_signature": "doc001.generated_spec_changed.human_explanation",
       "rule_id": "DOC001",
       "severity": "warn",
       "confidence": "high",

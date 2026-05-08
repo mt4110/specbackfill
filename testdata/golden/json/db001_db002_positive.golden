@@ -16,6 +16,7 @@
   "findings": [
     {
       "finding_id": "v0-82e2676f0c6030e7",
+      "omission_signature": "db001.schema_changed.migration_companion",
       "rule_id": "DB001",
       "severity": "error",
       "confidence": "high",
@@ -37,6 +38,7 @@
     },
     {
       "finding_id": "v0-6c33055056517ccb",
+      "omission_signature": "db002.destructive_storage.rollback_backfill",
       "rule_id": "DB002",
       "severity": "warn",
       "confidence": "high",
