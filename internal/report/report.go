@@ -127,6 +127,9 @@ func normalizeObligationArtifactSlices(obligation *model.Obligation) {
 	if obligation.Anchor.Evidence == nil {
 		obligation.Anchor.Evidence = []model.Evidence{}
 	}
+	if obligation.RequiredCompanions == nil {
+		obligation.RequiredCompanions = []model.RequiredCompanion{}
+	}
 	for index := range obligation.RequiredCompanions {
 		if obligation.RequiredCompanions[index].Satisfiers == nil {
 			obligation.RequiredCompanions[index].Satisfiers = []string{}

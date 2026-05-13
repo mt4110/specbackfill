@@ -16,6 +16,11 @@ var grpcCodeRE = regexp.MustCompile(`\bcodes\.[A-Z][A-Za-z0-9_]+\b`)
 var durationLiteralRE = regexp.MustCompile(`\b\d+\s*(ms|s|m|h)\b`)
 var cronExpressionRE = regexp.MustCompile(`(?i)["'](?:@(?:annually|yearly|monthly|weekly|daily|midnight|hourly|reboot)|(?:[a-z0-9*/?,lw#-]+\s+){4,6}[a-z0-9*/?,lw#-]+)["']`)
 
+const (
+	maxSatisfierEvidencePerFile       = 3
+	maxSatisfierEvidencePerObligation = 12
+)
+
 func Evaluate(diff model.Diff, repoProfile model.RepoProfile) []model.Finding {
 	return FindingsFromObligations(EvaluateObligations(diff, repoProfile))
 }
@@ -931,6 +936,9 @@ func collectAUTH001CompanionEvidence(diff model.Diff, paths []string, context au
 		}
 		if isMetadataOnlyCompanionMove(file) {
 			evidence = append(evidence, makeFileStatusEvidence(file))
+			if len(evidence) == maxSatisfierEvidencePerObligation {
+				return evidence
+			}
 			continue
 		}
 		for _, hunk := range file.Hunks {
@@ -943,6 +951,9 @@ func collectAUTH001CompanionEvidence(diff model.Diff, paths []string, context au
 				}
 				if isAUTH001AllowLine(line.Text) || isAUTH001DenyLine(line.Text) || isAUTH001SecurityNoteLine(line.Text) {
 					evidence = append(evidence, makeEvidence(file.Path, line))
+					if len(evidence) == maxSatisfierEvidencePerObligation {
+						return evidence
+					}
 				}
 			}
 		}
@@ -1479,6 +1490,9 @@ func collectOPS001CompanionEvidence(diff model.Diff, paths []string, context ops
 		}
 		if isMetadataOnlyCompanionMove(file) {
 			evidence = append(evidence, makeFileStatusEvidence(file))
+			if len(evidence) == maxSatisfierEvidencePerObligation {
+				return evidence
+			}
 			continue
 		}
 		lowerPath := strings.ToLower(file.Path)
@@ -1495,6 +1509,9 @@ func collectOPS001CompanionEvidence(diff model.Diff, paths []string, context ops
 				}
 				if isOPS001CompanionLine(line.Text) {
 					evidence = append(evidence, makeEvidence(file.Path, line))
+					if len(evidence) == maxSatisfierEvidencePerObligation {
+						return evidence
+					}
 				}
 			}
 		}
@@ -2040,7 +2057,12 @@ func companionMatchPaths(matches []companionMatch) []string {
 func companionMatchEvidence(matches []companionMatch) []model.Evidence {
 	evidence := make([]model.Evidence, 0, len(matches))
 	for _, match := range matches {
-		evidence = append(evidence, match.evidence...)
+		for _, item := range match.evidence {
+			evidence = append(evidence, item)
+			if len(evidence) == maxSatisfierEvidencePerObligation {
+				return evidence
+			}
+		}
 	}
 	return evidence
 }
@@ -2086,6 +2108,9 @@ func collectFilePositiveChangeEvidence(file model.File, terms []string, lineMatc
 			}
 			if lineMatch(file, line, terms) {
 				evidence = append(evidence, makeEvidence(file.Path, line))
+				if len(evidence) == maxSatisfierEvidencePerFile {
+					return evidence
+				}
 			}
 		}
 	}

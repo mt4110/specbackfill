@@ -391,6 +391,13 @@ func TestBuildObligationArtifactAddsVersionedMetadataAndIDs(t *testing.T) {
 	if satisfied.Obligations[0].StatusReason == nil || satisfied.Obligations[0].StatusReason.Reason != model.StatusReasonCompanionPresent {
 		t.Fatalf("satisfied obligation status reason = %+v, want companion_present", satisfied.Obligations[0].StatusReason)
 	}
+
+	malformed := baseObligation
+	malformed.RequiredCompanions = nil
+	artifact := BuildObligationArtifact(ObligationArtifactOptions{InputKind: "diff_file", DiffInput: []byte("diff")}, []model.Obligation{malformed})
+	if artifact.Obligations[0].RequiredCompanions == nil {
+		t.Fatalf("nil required companions were not normalized: %+v", artifact.Obligations[0])
+	}
 }
 
 func TestBuildOverwritesGeneratedFindingMetadata(t *testing.T) {

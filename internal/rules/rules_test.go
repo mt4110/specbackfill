@@ -383,6 +383,50 @@ func TestSuppressedObligationsIncludeReasonAndEvidence(t *testing.T) {
 	}
 }
 
+func TestSatisfierEvidenceIsBounded(t *testing.T) {
+	t.Parallel()
+
+	lines := make([]model.Line, 0, maxSatisfierEvidencePerFile+4)
+	for index := 0; index < maxSatisfierEvidencePerFile+4; index++ {
+		lines = append(lines, model.Line{
+			Kind:    model.LineKindAdded,
+			Text:    "user companion evidence",
+			NewLine: index + 1,
+		})
+	}
+	file := model.File{
+		Path: "docs/api.md",
+		Hunks: []model.Hunk{{
+			Lines: lines,
+		}},
+	}
+
+	fileEvidence := collectFilePositiveChangeEvidence(file, nil, func(model.File, model.Line, []string) bool {
+		return true
+	})
+	if len(fileEvidence) != maxSatisfierEvidencePerFile {
+		t.Fatalf("len(file evidence) = %d, want cap %d", len(fileEvidence), maxSatisfierEvidencePerFile)
+	}
+
+	matches := make([]companionMatch, 0, maxSatisfierEvidencePerObligation+1)
+	for index := 0; index < maxSatisfierEvidencePerObligation+1; index++ {
+		matches = append(matches, companionMatch{
+			path: "docs/api.md",
+			evidence: []model.Evidence{{
+				File:    "docs/api.md",
+				Line:    index + 1,
+				Kind:    string(model.LineKindAdded),
+				Excerpt: "user companion evidence",
+			}},
+		})
+	}
+
+	obligationEvidence := companionMatchEvidence(matches)
+	if len(obligationEvidence) != maxSatisfierEvidencePerObligation {
+		t.Fatalf("len(obligation evidence) = %d, want cap %d", len(obligationEvidence), maxSatisfierEvidencePerObligation)
+	}
+}
+
 func TestFindingsIncludeRequiredFields(t *testing.T) {
 	t.Parallel()
 
