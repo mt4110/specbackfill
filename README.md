@@ -69,7 +69,7 @@ specbackfill fixtures report
 - 終了コード: `0` no findings, `1` findings at threshold, `2` tool error
 - `--summary`: severity counts と fired rules だけを表示します。finding 判定は変えません。
 - `--explain`: 既存 finding に紐づく grounded explanation を追加します。finding 自体は増やしません。
-- `--emit-obligations`: `schema_version`, `tool`, `run`, `obligations` を持つ `obligations.v1` JSON artifact を出します。`--format` は省略するか `--format json` を指定します。
+- `--emit-obligations`: `schema_version`, `tool`, `run`, `obligations` を持つ `obligations.v1` JSON artifact を出します。`satisfied` の companion evidence と `suppressed` の reason/evidence もこの artifact で確認できます。`--format` は省略するか `--format json` を指定します。
 - JSON findings には deterministic な `finding_id` と `omission_signature` が入ります。
 - 通常の `--format json` は findings 契約です。obligation/status artifact は [schemas/obligations.schema.json](./schemas/obligations.schema.json) に従う別契約です。
 - `rules`: 実装済み default v0 rule の ID、severity、意図、expected companions を表示します。diff は評価しません。

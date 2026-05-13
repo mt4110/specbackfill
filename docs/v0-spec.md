@@ -200,6 +200,8 @@ NOT change rule evaluation or exit-code threshold behavior.
 `--emit-obligations` MAY be combined with `--format json` for caller clarity,
 but MUST NOT be combined with `--format text`, `--format markdown`, `--summary`,
 or `--explain`.
+The obligation artifact MAY include satisfied and suppressed obligations so
+callers can inspect why anchor or candidate evidence did not become a finding.
 
 ### 4.6 Severity threshold
 
@@ -558,6 +560,23 @@ include at least:
 - `required_companions`
 - `evidence`
 - `diff_local_claim`
+
+When an obligation is `satisfied`, companion-present evidence MUST be visible
+from `required_companions[*].satisfier_evidence` and summarized by
+`status_reason.reason: "companion_present"`.
+
+When an obligation is `suppressed`, the artifact MUST include a `suppression`
+object with a documented reason and concrete diff-local evidence. Current v0
+suppression reasons are:
+
+- `docs_only`
+- `tests_only`
+- `example_only`
+- `sample_only`
+- `generated_only`
+- `migration_only`
+
+Suppressed obligations MUST NOT become findings.
 
 The artifact MUST preserve all of the following boundaries:
 

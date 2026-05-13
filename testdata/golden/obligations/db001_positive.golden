@@ -42,6 +42,7 @@
           "kind": "migration_companion",
           "status": "missing",
           "satisfiers": [],
+          "satisfier_evidence": [],
           "expected_paths": [
             "migrations/**",
             "db/migrations/**",

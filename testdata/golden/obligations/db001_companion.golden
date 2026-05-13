@@ -44,6 +44,14 @@
           "satisfiers": [
             "prisma/migrations/20260329010101_add_email/migration.sql"
           ],
+          "satisfier_evidence": [
+            {
+              "file": "prisma/migrations/20260329010101_add_email/migration.sql",
+              "line": 1,
+              "kind": "added",
+              "excerpt": "ALTER TABLE \"User\" ADD COLUMN \"email\" TEXT;"
+            }
+          ],
           "expected_paths": [
             "migrations/**",
             "db/migrations/**",
@@ -59,6 +67,17 @@
           "excerpt": "email String @unique"
         }
       ],
+      "status_reason": {
+        "reason": "companion_present",
+        "evidence": [
+          {
+            "file": "prisma/migrations/20260329010101_add_email/migration.sql",
+            "line": 1,
+            "kind": "added",
+            "excerpt": "ALTER TABLE \"User\" ADD COLUMN \"email\" TEXT;"
+          }
+        ]
+      },
       "suppression": null,
       "downstream": {
         "import_kind": "deterministic_static_layer",

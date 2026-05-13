@@ -69,7 +69,7 @@ specbackfill fixtures report
 - Exit codes: `0` no findings, `1` findings at threshold, `2` tool error
 - `--summary`: shows only severity counts and fired rules. It does not change finding evaluation.
 - `--explain`: adds grounded explanations tied to existing findings. It does not add findings.
-- `--emit-obligations`: emits an `obligations.v1` JSON artifact with `schema_version`, `tool`, `run`, and `obligations`. Omit `--format` or use `--format json`.
+- `--emit-obligations`: emits an `obligations.v1` JSON artifact with `schema_version`, `tool`, `run`, and `obligations`. The artifact also exposes companion evidence for `satisfied` obligations and reason/evidence for `suppressed` obligations. Omit `--format` or use `--format json`.
 - JSON findings include deterministic `finding_id` and `omission_signature` fields.
 - Normal `--format json` is the findings contract. The obligation/status artifact is a separate contract described by [schemas/obligations.schema.json](./schemas/obligations.schema.json).
 - `rules`: shows implemented default v0 rule IDs, severities, intent, and expected companions. It does not evaluate a diff.

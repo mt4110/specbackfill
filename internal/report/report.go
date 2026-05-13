@@ -81,6 +81,22 @@ func withObligationIDs(obligations []model.Obligation) []model.Obligation {
 	copy(withIDs, obligations)
 	for index := range withIDs {
 		withIDs[index].ObligationID = stableObligationID(withIDs[index])
+		normalizeObligationArtifactSlices(&withIDs[index])
+		if withIDs[index].Status == model.ObligationStatusSatisfied && withIDs[index].StatusReason == nil {
+			satisfierEvidence := firstSatisfierEvidence(withIDs[index].RequiredCompanions)
+			if len(satisfierEvidence) > 0 {
+				withIDs[index].StatusReason = &model.ObligationStatusReason{
+					Reason:   model.StatusReasonCompanionPresent,
+					Evidence: satisfierEvidence,
+				}
+			}
+		}
+		if withIDs[index].Status == model.ObligationStatusSuppressed && withIDs[index].StatusReason == nil && withIDs[index].Suppression != nil {
+			withIDs[index].StatusReason = &model.ObligationStatusReason{
+				Reason:   model.StatusReason(withIDs[index].Suppression.Reason),
+				Evidence: withIDs[index].Suppression.Evidence,
+			}
+		}
 		if withIDs[index].Status != model.ObligationStatusMissing {
 			withIDs[index].FindingID = nil
 			withIDs[index].OmissionSignature = nil
@@ -102,6 +118,44 @@ func withObligationIDs(obligations []model.Obligation) []model.Obligation {
 		withIDs[index].OmissionSignature = &signature
 	}
 	return withIDs
+}
+
+func normalizeObligationArtifactSlices(obligation *model.Obligation) {
+	if obligation.Evidence == nil {
+		obligation.Evidence = []model.Evidence{}
+	}
+	if obligation.Anchor.Evidence == nil {
+		obligation.Anchor.Evidence = []model.Evidence{}
+	}
+	if obligation.RequiredCompanions == nil {
+		obligation.RequiredCompanions = []model.RequiredCompanion{}
+	}
+	for index := range obligation.RequiredCompanions {
+		if obligation.RequiredCompanions[index].Satisfiers == nil {
+			obligation.RequiredCompanions[index].Satisfiers = []string{}
+		}
+		if obligation.RequiredCompanions[index].SatisfierEvidence == nil {
+			obligation.RequiredCompanions[index].SatisfierEvidence = []model.Evidence{}
+		}
+		if obligation.RequiredCompanions[index].ExpectedPaths == nil {
+			obligation.RequiredCompanions[index].ExpectedPaths = []string{}
+		}
+	}
+	if obligation.StatusReason != nil && obligation.StatusReason.Evidence == nil {
+		obligation.StatusReason.Evidence = []model.Evidence{}
+	}
+	if obligation.Suppression != nil && obligation.Suppression.Evidence == nil {
+		obligation.Suppression.Evidence = []model.Evidence{}
+	}
+}
+
+func firstSatisfierEvidence(companions []model.RequiredCompanion) []model.Evidence {
+	for _, companion := range companions {
+		if len(companion.SatisfierEvidence) > 0 {
+			return companion.SatisfierEvidence
+		}
+	}
+	return nil
 }
 
 func omissionSignature(ruleID string) string {
