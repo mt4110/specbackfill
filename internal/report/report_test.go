@@ -375,12 +375,21 @@ func TestBuildObligationArtifactAddsVersionedMetadataAndIDs(t *testing.T) {
 	satisfiedObligation.Status = model.ObligationStatusSatisfied
 	satisfiedObligation.RequiredCompanions[0].Status = model.ObligationStatusSatisfied
 	satisfiedObligation.RequiredCompanions[0].Satisfiers = []string{"prisma/migrations/20260329010101_add_email/migration.sql"}
+	satisfiedObligation.RequiredCompanions[0].SatisfierEvidence = []model.Evidence{{
+		File:    "prisma/migrations/20260329010101_add_email/migration.sql",
+		Line:    1,
+		Kind:    string(model.LineKindAdded),
+		Excerpt: "ALTER TABLE \"User\" ADD COLUMN \"email\" TEXT;",
+	}}
 	satisfied := BuildObligationArtifact(ObligationArtifactOptions{InputKind: "diff_file", DiffInput: []byte("diff")}, []model.Obligation{satisfiedObligation})
 	if satisfied.Obligations[0].ObligationID != missingObligation.ObligationID {
 		t.Fatalf("obligation ID changed across status: missing=%q satisfied=%q", missingObligation.ObligationID, satisfied.Obligations[0].ObligationID)
 	}
 	if satisfied.Obligations[0].FindingID != nil || satisfied.Obligations[0].OmissionSignature != nil {
 		t.Fatalf("satisfied obligation has finding metadata: %+v", satisfied.Obligations[0])
+	}
+	if satisfied.Obligations[0].StatusReason == nil || satisfied.Obligations[0].StatusReason.Reason != model.StatusReasonCompanionPresent {
+		t.Fatalf("satisfied obligation status reason = %+v, want companion_present", satisfied.Obligations[0].StatusReason)
 	}
 }
 

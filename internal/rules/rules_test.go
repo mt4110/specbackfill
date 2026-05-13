@@ -173,9 +173,11 @@ func TestEvaluateObligationsStatuses(t *testing.T) {
 			wantCount:  1,
 		},
 		{
-			name:      "negative migration-only emits no obligation",
-			file:      "db001_migration_only.diff",
-			wantCount: 0,
+			name:       "negative migration-only emits suppressed obligation",
+			file:       "db001_migration_only.diff",
+			wantRule:   "DB001",
+			wantStatus: model.ObligationStatusSuppressed,
+			wantCount:  1,
 		},
 	}
 
@@ -210,6 +212,9 @@ func TestEvaluateObligationsStatuses(t *testing.T) {
 			}
 			if tc.wantStatus == model.ObligationStatusSatisfied && len(obligation.RequiredCompanions[0].Satisfiers) == 0 {
 				t.Fatalf("satisfied obligation missing satisfiers: %+v", obligation)
+			}
+			if tc.wantStatus == model.ObligationStatusSuppressed && obligation.Suppression == nil {
+				t.Fatalf("suppressed obligation missing suppression reason: %+v", obligation)
 			}
 		})
 	}
@@ -259,6 +264,120 @@ func TestSatisfiedObligationSatisfiersAreSpecificCompanionPaths(t *testing.T) {
 			gotPaths := obligation.RequiredCompanions[0].Satisfiers
 			if !reflect.DeepEqual(gotPaths, tc.wantPaths) {
 				t.Fatalf("satisfiers = %v, want %v", gotPaths, tc.wantPaths)
+			}
+		})
+	}
+}
+
+func TestSatisfiedObligationIncludesCompanionEvidenceAndReason(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name             string
+		file             string
+		wantRule         string
+		wantEvidenceFile string
+	}{
+		{name: "db", file: "db001_companion.diff", wantRule: "DB001", wantEvidenceFile: "prisma/migrations/20260329010101_add_email/migration.sql"},
+		{name: "api", file: "api001_companion.diff", wantRule: "API001", wantEvidenceFile: "docs/api.md"},
+		{name: "auth", file: "auth001_companion.diff", wantRule: "AUTH001", wantEvidenceFile: "internal/auth/permissions_test.go"},
+		{name: "err", file: "err001_companion.diff", wantRule: "ERR001", wantEvidenceFile: "internal/http/handler_test.go"},
+		{name: "ops", file: "ops001_companion.diff", wantRule: "OPS001", wantEvidenceFile: "docs/runbooks/billing-worker.md"},
+		{name: "doc", file: "doc001_companion.diff", wantRule: "DOC001", wantEvidenceFile: "CHANGELOG.md"},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			obligations := EvaluateObligations(parseFixture(t, tc.file), model.RepoProfile{})
+			if len(obligations) != 1 {
+				t.Fatalf("len(obligations) = %d, want 1", len(obligations))
+			}
+
+			obligation := obligations[0]
+			if obligation.RuleID != tc.wantRule || obligation.Status != model.ObligationStatusSatisfied {
+				t.Fatalf("obligation = %+v, want %s satisfied", obligation, tc.wantRule)
+			}
+			if obligation.StatusReason == nil || obligation.StatusReason.Reason != model.StatusReasonCompanionPresent {
+				t.Fatalf("StatusReason = %+v, want companion_present", obligation.StatusReason)
+			}
+			if len(obligation.RequiredCompanions) != 1 || len(obligation.RequiredCompanions[0].SatisfierEvidence) == 0 {
+				t.Fatalf("satisfied obligation missing companion evidence: %+v", obligation)
+			}
+			if len(obligation.StatusReason.Evidence) == 0 {
+				t.Fatalf("status reason missing companion evidence: %+v", obligation)
+			}
+			gotEvidence := obligation.RequiredCompanions[0].SatisfierEvidence[0]
+			if gotEvidence.File != tc.wantEvidenceFile || gotEvidence.Kind != string(model.LineKindAdded) {
+				t.Fatalf("satisfier evidence = %+v, want added evidence in %s", gotEvidence, tc.wantEvidenceFile)
+			}
+		})
+	}
+}
+
+func TestSuppressedObligationsIncludeReasonAndEvidence(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		file       string
+		wantRule   string
+		wantReason model.SuppressionReason
+	}{
+		{name: "generated only", file: "cfg001_negative_generated_only.diff", wantRule: "CFG001", wantReason: model.SuppressionReasonGeneratedOnly},
+		{name: "docs only", file: "cfg001_docs_only.diff", wantRule: "CFG001", wantReason: model.SuppressionReasonDocsOnly},
+		{name: "tests only", file: "cfg001_negative_tests_only.diff", wantRule: "CFG001", wantReason: model.SuppressionReasonTestsOnly},
+		{name: "example only", file: "cfg001_negative_examples_only.diff", wantRule: "CFG001", wantReason: model.SuppressionReasonExampleOnly},
+		{name: "sample only", file: "cfg001_negative_samples_only.diff", wantRule: "CFG001", wantReason: model.SuppressionReasonSampleOnly},
+		{name: "api tests only", file: "api001_negative_tests_only.diff", wantRule: "API001", wantReason: model.SuppressionReasonTestsOnly},
+		{name: "api example only", file: "api001_negative_examples_only.diff", wantRule: "API001", wantReason: model.SuppressionReasonExampleOnly},
+		{name: "api sample only", file: "api001_negative_samples_only.diff", wantRule: "API001", wantReason: model.SuppressionReasonSampleOnly},
+		{name: "auth generated only", file: "auth001_negative_generated_only.diff", wantRule: "AUTH001", wantReason: model.SuppressionReasonGeneratedOnly},
+		{name: "auth tests only", file: "auth001_negative_tests_only.diff", wantRule: "AUTH001", wantReason: model.SuppressionReasonTestsOnly},
+		{name: "auth example only", file: "auth001_negative_examples_only.diff", wantRule: "AUTH001", wantReason: model.SuppressionReasonExampleOnly},
+		{name: "auth sample only", file: "auth001_negative_samples_only.diff", wantRule: "AUTH001", wantReason: model.SuppressionReasonSampleOnly},
+		{name: "err generated only", file: "err001_negative_generated_only.diff", wantRule: "ERR001", wantReason: model.SuppressionReasonGeneratedOnly},
+		{name: "err tests only", file: "err001_negative_tests_only.diff", wantRule: "ERR001", wantReason: model.SuppressionReasonTestsOnly},
+		{name: "err example only", file: "err001_negative_examples_only.diff", wantRule: "ERR001", wantReason: model.SuppressionReasonExampleOnly},
+		{name: "err sample only", file: "err001_negative_samples_only.diff", wantRule: "ERR001", wantReason: model.SuppressionReasonSampleOnly},
+		{name: "ops generated only", file: "ops001_negative_generated_only.diff", wantRule: "OPS001", wantReason: model.SuppressionReasonGeneratedOnly},
+		{name: "ops docs only", file: "ops001_negative_docs_only.diff", wantRule: "OPS001", wantReason: model.SuppressionReasonDocsOnly},
+		{name: "ops tests only", file: "ops001_negative_tests_only.diff", wantRule: "OPS001", wantReason: model.SuppressionReasonTestsOnly},
+		{name: "ops example only", file: "ops001_negative_examples_only.diff", wantRule: "OPS001", wantReason: model.SuppressionReasonExampleOnly},
+		{name: "ops sample only", file: "ops001_negative_samples_only.diff", wantRule: "OPS001", wantReason: model.SuppressionReasonSampleOnly},
+		{name: "doc docs only", file: "doc001_negative_docs_only.diff", wantRule: "DOC001", wantReason: model.SuppressionReasonDocsOnly},
+		{name: "doc tests only", file: "doc001_negative_tests_only.diff", wantRule: "DOC001", wantReason: model.SuppressionReasonTestsOnly},
+		{name: "doc example only", file: "doc001_negative_examples_only.diff", wantRule: "DOC001", wantReason: model.SuppressionReasonExampleOnly},
+		{name: "doc sample only", file: "doc001_negative_samples_only.diff", wantRule: "DOC001", wantReason: model.SuppressionReasonSampleOnly},
+		{name: "migration only", file: "db001_migration_only.diff", wantRule: "DB001", wantReason: model.SuppressionReasonMigrationOnly},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			obligations := EvaluateObligations(parseFixture(t, tc.file), model.RepoProfile{})
+			if len(obligations) != 1 {
+				t.Fatalf("len(obligations) = %d, want 1: %+v", len(obligations), obligations)
+			}
+			obligation := obligations[0]
+			if obligation.RuleID != tc.wantRule || obligation.Status != model.ObligationStatusSuppressed {
+				t.Fatalf("obligation = %+v, want %s suppressed", obligation, tc.wantRule)
+			}
+			if obligation.Suppression == nil || obligation.Suppression.Reason != tc.wantReason {
+				t.Fatalf("Suppression = %+v, want reason %s", obligation.Suppression, tc.wantReason)
+			}
+			if obligation.StatusReason == nil || obligation.StatusReason.Reason != model.StatusReason(tc.wantReason) {
+				t.Fatalf("StatusReason = %+v, want reason %s", obligation.StatusReason, tc.wantReason)
+			}
+			if len(obligation.Suppression.Evidence) == 0 || len(obligation.Anchor.Evidence) == 0 {
+				t.Fatalf("suppressed obligation missing evidence: %+v", obligation)
+			}
+			if len(FindingsFromObligations(obligations)) != 0 {
+				t.Fatalf("suppressed obligation turned into finding: %+v", obligations)
 			}
 		})
 	}
