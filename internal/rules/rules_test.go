@@ -78,6 +78,7 @@ func TestEvaluateFixtures(t *testing.T) {
 		{name: "auth001 unrelated 200 with deny still warns", file: "auth001_unrelated_200_with_deny.diff", want: []string{"AUTH001"}},
 		{name: "auth001 examples only negative", file: "auth001_negative_examples_only.diff", want: nil},
 		{name: "auth001 samples only negative", file: "auth001_negative_samples_only.diff", want: nil},
+		{name: "auth001 testdata golden negative", file: "auth001_negative_testdata_golden.diff", want: nil},
 		{name: "auth001 non-auth path negative", file: "auth001_negative_non_auth_path.diff", want: nil},
 		{name: "auth001 generated only negative", file: "auth001_negative_generated_only.diff", want: nil},
 		{name: "auth001 tests only negative", file: "auth001_negative_tests_only.diff", want: nil},
@@ -180,6 +181,36 @@ func TestFindingsIncludeRequiredFields(t *testing.T) {
 			}
 			if len(finding.ExpectedCompanions) == 0 {
 				t.Fatalf("expected companions missing: %+v", finding)
+			}
+		})
+	}
+}
+
+func TestScanAnchorRuleIDs(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		file string
+		want []string
+	}{
+		{name: "positive DB001 anchor", file: "db001_positive.diff", want: []string{"DB001"}},
+		{name: "companion satisfied still has DB001 anchor", file: "db001_companion.diff", want: []string{"DB001"}},
+		{name: "migration-only has no schema anchor", file: "db001_migration_only.diff", want: nil},
+		{name: "composite anchors", file: "api001_err001_positive.diff", want: []string{"API001", "ERR001"}},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := ScanAnchorRuleIDs(parseFixture(t, tc.file))
+			if tc.want == nil {
+				tc.want = []string{}
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("ScanAnchorRuleIDs() = %v, want %v", got, tc.want)
 			}
 		})
 	}

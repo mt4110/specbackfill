@@ -1,5 +1,10 @@
 specbackfill check
+input: diff file
+note: only the provided unified diff file was evaluated
 changed files: 1
+changed file summary:
+  - migrations: 1
+    - prisma/migrations/20260330010101_drop_user_email/migration.sql
 findings: error=0 warn=1 info=0
 [warn] DB002 Destructive storage change detected, but no matching rollback/backfill companion moved with this diff
   why: Destructive storage lines moved in the diff, but no matching rollback note, backfill note, or compatibility test evidence moved with them.

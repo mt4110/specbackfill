@@ -12,7 +12,11 @@ import (
 )
 
 type Options struct {
-	SummaryOnly bool
+	SummaryOnly         bool
+	InputSummary        string
+	InputNotes          []string
+	AnchorScanAvailable bool
+	AnchorRuleIDs       []string
 }
 
 func Build(repoProfile model.RepoProfile, findings []model.Finding) model.Report {
@@ -100,16 +104,16 @@ func Write(w io.Writer, format string, diff model.Diff, result model.Report) err
 
 func WriteWithOptions(w io.Writer, format string, diff model.Diff, result model.Report, options Options) error {
 	if options.SummaryOnly {
-		return writeSummary(w, format, diff, result)
+		return writeSummary(w, format, diff, result, options)
 	}
 
 	switch format {
 	case "text":
-		return writeText(w, diff, result)
+		return writeText(w, diff, result, options)
 	case "json":
 		return writeJSON(w, result)
 	case "markdown":
-		return writeMarkdown(w, diff, result)
+		return writeMarkdown(w, diff, result, options)
 	default:
 		return fmt.Errorf("unsupported format %q", format)
 	}
@@ -138,11 +142,17 @@ func ExitCode(findings []model.Finding, failOn string) int {
 	}
 }
 
-func writeText(w io.Writer, diff model.Diff, result model.Report) error {
+func writeText(w io.Writer, diff model.Diff, result model.Report, options Options) error {
 	if _, err := fmt.Fprintln(w, "specbackfill check"); err != nil {
 		return err
 	}
+	if err := writeTextInputSummary(w, options); err != nil {
+		return err
+	}
 	if _, err := fmt.Fprintf(w, "changed files: %d\n", len(diff.Files)); err != nil {
+		return err
+	}
+	if err := writeTextFileSummary(w, diff); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintf(w, "findings: error=%d warn=%d info=%d\n", result.Summary.Error, result.Summary.Warn, result.Summary.Info); err != nil {
@@ -157,7 +167,13 @@ func writeText(w io.Writer, diff model.Diff, result model.Report) error {
 	}
 
 	if len(result.Findings) == 0 {
-		_, err := fmt.Fprintln(w, "No findings emitted.")
+		if _, err := fmt.Fprintln(w, "No findings emitted."); err != nil {
+			return err
+		}
+		if err := writeTextAnchorScan(w, options); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintln(w, "This means no implemented v0 companion-artifact rule fired for this diff; it does not prove the diff is complete.")
 		return err
 	}
 
@@ -208,20 +224,80 @@ func explanationForFinding(explanations []model.Explanation, index int, ruleID s
 	return model.Explanation{}, false
 }
 
+func writeTextInputSummary(w io.Writer, options Options) error {
+	if options.InputSummary == "" {
+		return nil
+	}
+	if _, err := fmt.Fprintf(w, "input: %s\n", options.InputSummary); err != nil {
+		return err
+	}
+	for _, note := range options.InputNotes {
+		if _, err := fmt.Fprintf(w, "note: %s\n", note); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeTextFileSummary(w io.Writer, diff model.Diff) error {
+	rows := fileSummaryRows(diff)
+	if len(rows) == 0 {
+		_, err := fmt.Fprintln(w, "changed file summary: none")
+		return err
+	}
+	if _, err := fmt.Fprintln(w, "changed file summary:"); err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if _, err := fmt.Fprintf(w, "  - %s: %d\n", row.label, row.count); err != nil {
+			return err
+		}
+		for _, sample := range row.samples {
+			if _, err := fmt.Fprintf(w, "    - %s\n", sample); err != nil {
+				return err
+			}
+		}
+		if remaining := row.count - len(row.samples); remaining > 0 {
+			if _, err := fmt.Fprintf(w, "    - ... %d more\n", remaining); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func writeTextAnchorScan(w io.Writer, options Options) error {
+	if !options.AnchorScanAvailable {
+		return nil
+	}
+	if len(options.AnchorRuleIDs) == 0 {
+		_, err := fmt.Fprintln(w, "anchor scan: no v0 anchor evidence matched.")
+		return err
+	}
+	_, err := fmt.Fprintf(w, "anchor scan: %s evidence matched, but no finding remained after companion/suppression checks.\n", strings.Join(options.AnchorRuleIDs, ", "))
+	return err
+}
+
 func writeJSON(w io.Writer, result model.Report) error {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
 }
 
-func writeMarkdown(w io.Writer, diff model.Diff, result model.Report) error {
+func writeMarkdown(w io.Writer, diff model.Diff, result model.Report, options Options) error {
 	if _, err := fmt.Fprintln(w, "### specbackfill findings"); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintln(w); err != nil {
 		return err
 	}
+	if err := writeMarkdownInputSummary(w, options); err != nil {
+		return err
+	}
 	if _, err := fmt.Fprintf(w, "- Changed files: %d\n", len(diff.Files)); err != nil {
+		return err
+	}
+	if err := writeMarkdownFileSummary(w, diff); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintf(w, "- Findings: error=%d warn=%d info=%d\n", result.Summary.Error, result.Summary.Warn, result.Summary.Info); err != nil {
@@ -236,7 +312,13 @@ func writeMarkdown(w io.Writer, diff model.Diff, result model.Report) error {
 	}
 
 	if len(result.Findings) == 0 {
-		_, err := fmt.Fprintln(w, "\nNo findings emitted.")
+		if _, err := fmt.Fprintln(w, "\nNo findings emitted."); err != nil {
+			return err
+		}
+		if err := writeMarkdownAnchorScan(w, options); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintln(w, "\nThis means no implemented v0 companion-artifact rule fired for this diff; it does not prove the diff is complete.")
 		return err
 	}
 
@@ -273,24 +355,87 @@ func writeMarkdown(w io.Writer, diff model.Diff, result model.Report) error {
 	return nil
 }
 
-func writeSummary(w io.Writer, format string, diff model.Diff, result model.Report) error {
+func writeMarkdownInputSummary(w io.Writer, options Options) error {
+	if options.InputSummary == "" {
+		return nil
+	}
+	if _, err := fmt.Fprintf(w, "- Input: %s\n", options.InputSummary); err != nil {
+		return err
+	}
+	for _, note := range options.InputNotes {
+		if _, err := fmt.Fprintf(w, "- Note: %s\n", note); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeMarkdownFileSummary(w io.Writer, diff model.Diff) error {
+	rows := fileSummaryRows(diff)
+	if len(rows) == 0 {
+		_, err := fmt.Fprintln(w, "- Changed file summary: none")
+		return err
+	}
+	if _, err := fmt.Fprintln(w, "- Changed file summary:"); err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if _, err := fmt.Fprintf(w, "  - %s: %d\n", row.label, row.count); err != nil {
+			return err
+		}
+		for _, sample := range row.samples {
+			if _, err := fmt.Fprintf(w, "    - %s\n", markdownCode(sample)); err != nil {
+				return err
+			}
+		}
+		if remaining := row.count - len(row.samples); remaining > 0 {
+			if _, err := fmt.Fprintf(w, "    - ... %d more\n", remaining); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func writeMarkdownAnchorScan(w io.Writer, options Options) error {
+	if !options.AnchorScanAvailable {
+		return nil
+	}
+	if len(options.AnchorRuleIDs) == 0 {
+		_, err := fmt.Fprintln(w, "\nAnchor scan: no v0 anchor evidence matched.")
+		return err
+	}
+	_, err := fmt.Fprintf(w, "\nAnchor scan: `%s` evidence matched, but no finding remained after companion/suppression checks.\n", strings.Join(options.AnchorRuleIDs, "`, `"))
+	return err
+}
+
+func writeSummary(w io.Writer, format string, diff model.Diff, result model.Report, options Options) error {
 	switch format {
 	case "text":
-		return writeTextSummary(w, diff, result)
+		return writeTextSummary(w, diff, result, options)
 	case "json":
 		return writeJSONSummary(w, diff, result)
 	case "markdown":
-		return writeMarkdownSummary(w, diff, result)
+		return writeMarkdownSummary(w, diff, result, options)
 	default:
 		return fmt.Errorf("unsupported format %q", format)
 	}
 }
 
-func writeTextSummary(w io.Writer, diff model.Diff, result model.Report) error {
+func writeTextSummary(w io.Writer, diff model.Diff, result model.Report, options Options) error {
 	if _, err := fmt.Fprintln(w, "specbackfill summary"); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "changed files: %d\n\n", len(diff.Files)); err != nil {
+	if err := writeTextInputSummary(w, options); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "changed files: %d\n", len(diff.Files)); err != nil {
+		return err
+	}
+	if err := writeTextFileSummary(w, diff); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(w); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintf(w, "error: %d\n", result.Summary.Error); err != nil {
@@ -322,14 +467,20 @@ func writeTextRuleCounts(w io.Writer, findings []model.Finding) error {
 	return nil
 }
 
-func writeMarkdownSummary(w io.Writer, diff model.Diff, result model.Report) error {
+func writeMarkdownSummary(w io.Writer, diff model.Diff, result model.Report, options Options) error {
 	if _, err := fmt.Fprintln(w, "### specbackfill summary"); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintln(w); err != nil {
 		return err
 	}
+	if err := writeMarkdownInputSummary(w, options); err != nil {
+		return err
+	}
 	if _, err := fmt.Fprintf(w, "- Changed files: %d\n", len(diff.Files)); err != nil {
+		return err
+	}
+	if err := writeMarkdownFileSummary(w, diff); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintf(w, "- Error: %d\n", result.Summary.Error); err != nil {
@@ -377,6 +528,183 @@ func writeJSONSummary(w io.Writer, diff model.Diff, result model.Report) error {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(payload)
+}
+
+type fileSummaryRow struct {
+	label   string
+	count   int
+	samples []string
+}
+
+const maxFileSummarySamples = 3
+
+func fileSummaryRows(diff model.Diff) []fileSummaryRow {
+	counts := map[string]int{}
+	samples := map[string][]string{}
+	for _, file := range diff.Files {
+		label := classifyFile(file.Path)
+		counts[label]++
+		if len(samples[label]) < maxFileSummarySamples {
+			samples[label] = append(samples[label], file.Path)
+		}
+	}
+
+	rows := make([]fileSummaryRow, 0, len(fileSummaryOrder))
+	for _, label := range fileSummaryOrder {
+		count := counts[label]
+		if count == 0 {
+			continue
+		}
+		rows = append(rows, fileSummaryRow{label: label, count: count, samples: samples[label]})
+	}
+	return rows
+}
+
+var fileSummaryOrder = []string{
+	"db schema",
+	"migrations",
+	"API specs",
+	"generated",
+	"docs",
+	"tests",
+	"test fixtures",
+	"config/ci",
+	"scripts",
+	"Go source",
+	"Rust source",
+	"TypeScript source",
+	"JavaScript source",
+	"Python source",
+	"SQL",
+	"examples/samples",
+	"other",
+}
+
+func classifyFile(filePath string) string {
+	lower := strings.ToLower(filePath)
+	base := baseName(lower)
+
+	switch {
+	case lower == "schema.prisma" || lower == "db/schema.sql" || strings.HasPrefix(lower, "ent/schema/") || strings.HasPrefix(lower, "sqlc/schema/"):
+		return "db schema"
+	case strings.HasPrefix(lower, "migrations/") || strings.HasPrefix(lower, "db/migrations/") || strings.HasPrefix(lower, "prisma/migrations/"):
+		return "migrations"
+	case base == "schema.graphql" ||
+		((strings.HasPrefix(base, "openapi") || strings.Contains(lower, "/openapi/")) && (strings.HasSuffix(base, ".yaml") || strings.HasSuffix(base, ".yml"))) ||
+		(strings.HasSuffix(lower, ".proto") && (strings.HasPrefix(lower, "proto/") || strings.Contains(lower, "/proto/"))):
+		return "API specs"
+	case strings.HasPrefix(lower, "testdata/"):
+		return "test fixtures"
+	case isSummaryExamplePath(lower):
+		return "examples/samples"
+	case isSummaryGeneratedPath(lower):
+		return "generated"
+	case isSummaryDocsPath(lower, base):
+		return "docs"
+	case isSummaryTestPath(lower, base):
+		return "tests"
+	case isSummaryConfigPath(lower, base):
+		return "config/ci"
+	case strings.HasPrefix(lower, "scripts/") || strings.HasPrefix(lower, "bin/") || strings.HasSuffix(base, ".sh"):
+		return "scripts"
+	case strings.HasSuffix(base, ".go"):
+		return "Go source"
+	case strings.HasSuffix(base, ".rs"):
+		return "Rust source"
+	case strings.HasSuffix(base, ".ts") || strings.HasSuffix(base, ".tsx"):
+		return "TypeScript source"
+	case strings.HasSuffix(base, ".js") || strings.HasSuffix(base, ".jsx") || strings.HasSuffix(base, ".mjs") || strings.HasSuffix(base, ".cjs"):
+		return "JavaScript source"
+	case strings.HasSuffix(base, ".py"):
+		return "Python source"
+	case strings.HasSuffix(base, ".sql"):
+		return "SQL"
+	default:
+		return "other"
+	}
+}
+
+func baseName(filePath string) string {
+	lastSlash := strings.LastIndex(filePath, "/")
+	if lastSlash == -1 {
+		return filePath
+	}
+	return filePath[lastSlash+1:]
+}
+
+func isSummaryGeneratedPath(filePath string) bool {
+	base := baseName(filePath)
+	return strings.HasSuffix(base, ".pb.go") ||
+		strings.Contains(base, ".generated.") ||
+		strings.HasPrefix(base, "generated_") ||
+		hasSummaryPathSegment(filePath, "generated") ||
+		hasSummaryPathSegment(filePath, "gen")
+}
+
+func isSummaryDocsPath(filePath, base string) bool {
+	return strings.HasPrefix(filePath, "docs/") ||
+		strings.HasPrefix(base, "readme") ||
+		strings.HasPrefix(base, "changelog") ||
+		strings.HasPrefix(base, "upgrade") ||
+		strings.HasSuffix(base, ".md") ||
+		strings.HasSuffix(base, ".mdx") ||
+		strings.HasSuffix(base, ".rst")
+}
+
+func isSummaryTestPath(filePath, base string) bool {
+	return strings.HasSuffix(base, "_test.go") ||
+		strings.HasSuffix(base, ".test.ts") ||
+		strings.HasSuffix(base, ".test.tsx") ||
+		strings.HasSuffix(base, ".spec.ts") ||
+		strings.HasSuffix(base, ".spec.tsx") ||
+		hasSummaryPathSegment(filePath, "tests") ||
+		hasSummaryPathSegment(filePath, "test") ||
+		hasSummaryPathSegment(filePath, "integration") ||
+		hasSummaryPathSegment(filePath, "contract") ||
+		hasSummaryPathSegment(filePath, "e2e")
+}
+
+func isSummaryConfigPath(filePath, base string) bool {
+	return strings.HasPrefix(filePath, ".github/") ||
+		strings.HasPrefix(filePath, ".gitlab/") ||
+		strings.HasPrefix(filePath, "configs/") ||
+		strings.HasPrefix(filePath, "config/") ||
+		base == ".gitlab-ci.yml" ||
+		base == ".gitlab-ci.yaml" ||
+		base == ".mise.toml" ||
+		base == "makefile" ||
+		base == "justfile" ||
+		base == "go.mod" ||
+		base == "go.sum" ||
+		base == "cargo.toml" ||
+		base == "cargo.lock" ||
+		base == "package.json" ||
+		base == "package-lock.json" ||
+		base == "pnpm-lock.yaml" ||
+		base == "yarn.lock" ||
+		base == "tsconfig.json" ||
+		strings.HasSuffix(base, ".toml") ||
+		strings.HasSuffix(base, ".yaml") ||
+		strings.HasSuffix(base, ".yml") ||
+		strings.HasSuffix(base, ".json")
+}
+
+func isSummaryExamplePath(filePath string) bool {
+	return hasSummaryPathSegment(filePath, "examples") ||
+		hasSummaryPathSegment(filePath, "example") ||
+		hasTopLevelSummaryPathSegment(filePath, "samples") ||
+		hasTopLevelSummaryPathSegment(filePath, "sample")
+}
+
+func hasSummaryPathSegment(filePath, segment string) bool {
+	return filePath == segment ||
+		strings.HasPrefix(filePath, segment+"/") ||
+		strings.Contains(filePath, "/"+segment+"/") ||
+		strings.HasSuffix(filePath, "/"+segment)
+}
+
+func hasTopLevelSummaryPathSegment(filePath, segment string) bool {
+	return filePath == segment || strings.HasPrefix(filePath, segment+"/")
 }
 
 func formatEvidence(evidence model.Evidence) string {

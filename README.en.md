@@ -79,7 +79,15 @@ go install github.com/mt4110/specbackfill/cmd/specbackfill@latest
 specbackfill check --diff-file change.diff --format text --fail-on off
 ```
 
-When developing this repository itself, `go run ./cmd/specbackfill` is also useful.
+When trying the local checkout, `make install` installs the command to `~/.local/bin/specbackfill`:
+
+```bash
+make install
+cd /path/to/another/project
+specbackfill check --fail-on off
+```
+
+When developing this repository itself, `make trial` and `go run ./cmd/specbackfill` are also useful.
 
 ## CI Usage
 
@@ -124,20 +132,41 @@ jobs:
 
 ## Local Verification
 
-With mise, install the repository toolchain before running checks:
+With mise, install the repository toolchain before running checks. During development, the Makefile provides short commands:
 
 ```bash
 mise install
-mise run test
-mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format text --fail-on off
-mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --format json --fail-on off
-mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --format markdown --fail-on off
-mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --summary --fail-on off
-mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format json --fail-on off --explain
-mise exec -- go run ./cmd/specbackfill rules list
-mise exec -- go run ./cmd/specbackfill rules show DB001
-mise exec -- go run ./cmd/specbackfill fixtures report
+make install
+make trial
+make test
+make check
+make pr BASE=main HEAD=HEAD
+make patch DIFF=testdata/patches/db001_positive.diff
+make json
+make md
+make summary
+make rules
+make rule RULE=DB001
+make fixtures
 ```
+
+`make trial` is a self-check for this repository. To check another project, install the command with `make install`, then run `specbackfill check --fail-on off` from that project's root.
+
+The `input:` line shows which diff source was evaluated. `git range diff` does not include uncommitted working tree changes. `working tree diff` does not include untracked files unless they are made visible to git, for example with `git add -N`.
+
+The `changed file summary:` line groups evaluated files into coarse categories such as docs, tests, migrations, API specs, and Go source. Each category shows up to three representative files. It is a reading aid only and does not change findings or exit codes.
+
+## Trial Check Completion
+
+Start with `specbackfill check --fail-on off` or an equivalent advisory check such as `make trial`. A trial check for a diff is done when:
+
+- `make check` or `make pr BASE=main HEAD=HEAD` completes without a tool error
+- any emitted finding is understandable from its rule ID, evidence, and expected companions
+- wording stays diff-local and does not claim repository-wide absence
+- noisy, confusing, or wrong findings are kept as candidates for synthetic fixtures
+- `make trial`, or `make test` and `make fixtures`, is checked before moving into quality changes
+
+If the same noisy pattern repeats, harden fixtures and suppressions in a small slice before turning the check into a blocking gate.
 
 ## Implemented Rules
 

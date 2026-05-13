@@ -1,5 +1,12 @@
 specbackfill check
+input: diff file
+note: only the provided unified diff file was evaluated
 changed files: 2
+changed file summary:
+  - API specs: 1
+    - openapi.yaml
+  - Go source: 1
+    - internal/http/handler.go
 findings: error=0 warn=2 info=0
 [warn] API001 Public API changed, but no matching contract-test/docs companion moved with this diff
   why: An explicit API spec file moved in the diff, but no matching contract-test/docs companion evidence moved with it.

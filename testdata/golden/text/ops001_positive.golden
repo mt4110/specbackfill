@@ -1,5 +1,10 @@
 specbackfill check
+input: diff file
+note: only the provided unified diff file was evaluated
 changed files: 1
+changed file summary:
+  - Go source: 1
+    - internal/workers/billing_consumer.go
 findings: error=0 warn=1 info=0
 [warn] OPS001 Worker/queue/retry behavior changed, but no matching observability/runbook companion moved with this diff
   why: Operational worker/queue/retry lines moved in the diff, but no matching observability, runbook, or rollback guidance evidence moved with them.

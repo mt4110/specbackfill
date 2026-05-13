@@ -79,7 +79,15 @@ go install github.com/mt4110/specbackfill/cmd/specbackfill@latest
 specbackfill check --diff-file change.diff --format text --fail-on off
 ```
 
-この repository 自体を開発する場合は、`go run ./cmd/specbackfill` でも確認できます。
+この repository からローカルに試す場合は、`make install` で `~/.local/bin/specbackfill` に入れられます。
+
+```bash
+make install
+cd /path/to/another/project
+specbackfill check --fail-on off
+```
+
+この repository 自体を開発する場合は、`make trial` や `go run ./cmd/specbackfill` でも確認できます。
 
 ## CI での利用
 
@@ -124,20 +132,41 @@ jobs:
 
 ## ローカル確認
 
-mise を使う場合は、この repository の Go toolchain を揃えてから確認できます。
+mise を使う場合は、この repository の Go toolchain を揃えてから確認できます。開発中は Makefile の短いコマンドを使えます。
 
 ```bash
 mise install
-mise run test
-mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format text --fail-on off
-mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --format json --fail-on off
-mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --format markdown --fail-on off
-mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/api001_err001_positive.diff --summary --fail-on off
-mise exec -- go run ./cmd/specbackfill check --diff-file testdata/patches/db001_positive.diff --format json --fail-on off --explain
-mise exec -- go run ./cmd/specbackfill rules list
-mise exec -- go run ./cmd/specbackfill rules show DB001
-mise exec -- go run ./cmd/specbackfill fixtures report
+make install
+make trial
+make test
+make check
+make pr BASE=main HEAD=HEAD
+make patch DIFF=testdata/patches/db001_positive.diff
+make json
+make md
+make summary
+make rules
+make rule RULE=DB001
+make fixtures
 ```
+
+`make trial` はこの repository の self-check です。他の project を点検する場合は、まず `make install` で `specbackfill` コマンドを入れてから、対象 project の root で `specbackfill check --fail-on off` を実行します。
+
+出力の `input:` 行は、どの差分を見たかを示します。`git range diff` の場合は未コミットの working tree 差分を含みません。`working tree diff` の場合、untracked files は `git add -N` などで git diff に見える状態にしない限り含みません。
+
+`changed file summary:` は、評価された差分のファイルを docs、tests、migrations、API specs、Go source などにざっくり分けた読み取り補助です。各カテゴリには代表ファイルが最大 3 件だけ表示されます。検出結果や exit code は変えません。
+
+## 試用チェックの完了目安
+
+まずは `specbackfill check --fail-on off` または `make trial` 相当の advisory mode で実 diff に当てます。ざっくり次を満たせば、その diff の試用チェックは完了です。
+
+- `make check` または `make pr BASE=main HEAD=HEAD` が tool error なく終わる
+- finding が出た場合、rule ID、evidence、expected companions を見て判断できる
+- 文言が repo-wide absence ではなく「この diff で companion が動いていない」に留まっている
+- うるさい・分かりにくい・外している finding は、次の synthetic fixture 候補として残す
+- 品質改善に入る前に `make trial` または `make test` と `make fixtures` で現在地を確認する
+
+繰り返し同じ種類のノイズが見えたら、 blocking に上げる前に fixture hardening と suppression を小さく入れます。
 
 ## 実装済みルール
 

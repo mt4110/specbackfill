@@ -359,6 +359,21 @@ analysis, or false-positive clustering. It MUST NOT change runtime detection.
 
 Human-readable output MUST preserve diff-local wording.
 
+Human-readable output SHOULD show the input source that was evaluated. This
+helps distinguish working tree diffs, `--base/--head` git range diffs, and
+`--diff-file` input.
+
+For git range input, output SHOULD make clear that uncommitted working tree
+changes are not included. For working tree input, output SHOULD make clear that
+untracked files are not included unless they are staged or made visible to git.
+
+Human-readable output MAY include a coarse changed-file summary grouped by path
+category, such as docs, tests, config/ci, migrations, API specs, or source
+language. This summary MAY include a small bounded sample of file paths per
+category plus a remaining count. It is only a navigation aid for the evaluated
+diff. It MUST NOT affect rule evaluation, JSON findings, exit behavior, or
+imply that the diff is complete.
+
 ### Good wording
 
 - "Schema changed, but no migration moved with this diff."
@@ -379,6 +394,16 @@ The output SHOULD make it easy for a reviewer to understand:
 ### 8.1 Text output
 
 `text` output SHOULD be concise and evidence-first.
+
+When no findings are emitted, text output SHOULD make clear that no implemented
+v0 companion-artifact rule fired for the diff. It MUST NOT imply that the diff
+is complete or that repository-wide companions exist.
+
+Human-readable output MAY include an anchor scan summary for no-finding output.
+The summary SHOULD distinguish "no implemented v0 anchor evidence matched" from
+"anchor evidence matched, but no finding remained after companion or suppression
+checks." This summary is explanatory only and MUST NOT change finding
+evaluation, JSON findings, or exit behavior.
 
 Recommended shape:
 
@@ -460,6 +485,9 @@ The `findings` array remains the deterministic machine contract. Explanations MU
 `markdown` output SHOULD contain the same finding semantics as `text` output in
 a Markdown-friendly shape. It MUST preserve rule IDs, severities, why text,
 evidence, expected companion categories, and diff-local wording.
+
+When no findings are emitted, markdown output SHOULD preserve the same
+diff-local non-claim as text output.
 
 Recommended shape:
 

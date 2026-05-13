@@ -1478,6 +1478,8 @@ func isConventionalTestPath(filePath string) bool {
 
 	return strings.HasPrefix(lower, "tests/") ||
 		strings.Contains(lower, "/tests/") ||
+		strings.HasPrefix(lower, "testdata/") ||
+		strings.Contains(lower, "/testdata/") ||
 		strings.HasPrefix(lower, "integration/") ||
 		strings.Contains(lower, "/integration/") ||
 		strings.HasPrefix(lower, "contract/") ||

@@ -1,4 +1,11 @@
 specbackfill check
+input: diff file
+note: only the provided unified diff file was evaluated
 changed files: 1
+changed file summary:
+  - migrations: 1
+    - prisma/migrations/20260329010101_add_email/migration.sql
 findings: error=0 warn=0 info=0
 No findings emitted.
+anchor scan: no v0 anchor evidence matched.
+This means no implemented v0 companion-artifact rule fired for this diff; it does not prove the diff is complete.

@@ -1,5 +1,12 @@
 specbackfill check
+input: diff file
+note: only the provided unified diff file was evaluated
 changed files: 2
+changed file summary:
+  - db schema: 1
+    - schema.prisma
+  - migrations: 1
+    - prisma/migrations/20260330010101_drop_legacy_login/migration.sql
 findings: error=1 warn=1 info=0
 [error] DB001 Schema changed, but no matching migration companion moved with this diff
   why: Schema-affecting lines moved in the diff, but no matching migration companion evidence moved with them.
