@@ -33,12 +33,73 @@ func Build(repoProfile model.RepoProfile, findings []model.Finding) model.Report
 	}
 }
 
+type ObligationArtifactOptions struct {
+	InputKind string
+	Base      string
+	Head      string
+	DiffInput []byte
+}
+
+func BuildObligationArtifact(options ObligationArtifactOptions, obligations []model.Obligation) model.ObligationArtifact {
+	if obligations == nil {
+		obligations = []model.Obligation{}
+	}
+
+	diffFingerprint := diffFingerprint(options.DiffInput)
+	runID := "run-" + strings.TrimPrefix(diffFingerprint, "sha256:")[:16]
+	withIDs := withObligationIDs(obligations)
+
+	return model.ObligationArtifact{
+		SchemaVersion: "obligations.v1",
+		Tool: model.ToolMetadata{
+			Name:    "specbackfill",
+			Version: "v0",
+		},
+		Run: model.RunMetadata{
+			RunID:           runID,
+			InputKind:       options.InputKind,
+			Base:            nullableString(options.Base),
+			Head:            nullableString(options.Head),
+			DiffFingerprint: diffFingerprint,
+		},
+		Obligations: withIDs,
+	}
+}
+
 func withFindingIDs(findings []model.Finding) []model.Finding {
 	withIDs := make([]model.Finding, len(findings))
 	copy(withIDs, findings)
 	for index := range withIDs {
 		withIDs[index].FindingID = stableFindingID(withIDs[index])
 		withIDs[index].OmissionSignature = omissionSignature(withIDs[index].RuleID)
+	}
+	return withIDs
+}
+
+func withObligationIDs(obligations []model.Obligation) []model.Obligation {
+	withIDs := make([]model.Obligation, len(obligations))
+	copy(withIDs, obligations)
+	for index := range withIDs {
+		withIDs[index].ObligationID = stableObligationID(withIDs[index])
+		if withIDs[index].Status != model.ObligationStatusMissing {
+			withIDs[index].FindingID = nil
+			withIDs[index].OmissionSignature = nil
+			continue
+		}
+
+		finding := model.Finding{
+			RuleID:             withIDs[index].RuleID,
+			Severity:           withIDs[index].Severity,
+			Confidence:         withIDs[index].Confidence,
+			Title:              withIDs[index].Title,
+			Why:                withIDs[index].Why,
+			Evidence:           withIDs[index].Evidence,
+			ExpectedCompanions: withIDs[index].ExpectedCompanions,
+		}
+		findingID := stableFindingID(finding)
+		signature := omissionSignature(withIDs[index].RuleID)
+		withIDs[index].FindingID = &findingID
+		withIDs[index].OmissionSignature = &signature
 	}
 	return withIDs
 }
@@ -89,6 +150,52 @@ func stableFindingID(finding model.Finding) string {
 
 	sum := fmt.Sprintf("%x", hash.Sum(nil))
 	return "v0-" + sum[:16]
+}
+
+func stableObligationID(obligation model.Obligation) string {
+	hash := sha256.New()
+	writeFingerprintField(hash, "version", "specbackfill-obligation-v1")
+	writeFingerprintField(hash, "rule_id", obligation.RuleID)
+	writeFingerprintField(hash, "anchor.kind", obligation.Anchor.Kind)
+	writeFingerprintField(hash, "anchor.path", obligation.Anchor.Path)
+	if obligation.Anchor.Line != nil {
+		writeFingerprintField(hash, "anchor.line", strconv.Itoa(*obligation.Anchor.Line))
+	}
+	writeEvidenceFingerprint(hash, "anchor.evidence", obligation.Anchor.Evidence)
+	writeFingerprintField(hash, "required_companion_count", strconv.Itoa(len(obligation.RequiredCompanions)))
+	for index, companion := range obligation.RequiredCompanions {
+		prefix := fmt.Sprintf("required_companion.%d.", index)
+		writeFingerprintField(hash, prefix+"kind", companion.Kind)
+		for pathIndex, expectedPath := range companion.ExpectedPaths {
+			writeFingerprintField(hash, fmt.Sprintf("%sexpected_path.%d", prefix, pathIndex), expectedPath)
+		}
+	}
+
+	sum := fmt.Sprintf("%x", hash.Sum(nil))
+	return "obl-v1-" + sum[:16]
+}
+
+func writeEvidenceFingerprint(hash io.Writer, prefix string, evidence []model.Evidence) {
+	writeFingerprintField(hash, prefix+".count", strconv.Itoa(len(evidence)))
+	for index, item := range evidence {
+		itemPrefix := fmt.Sprintf("%s.%d.", prefix, index)
+		writeFingerprintField(hash, itemPrefix+"file", item.File)
+		writeFingerprintField(hash, itemPrefix+"line", strconv.Itoa(item.Line))
+		writeFingerprintField(hash, itemPrefix+"kind", item.Kind)
+		writeFingerprintField(hash, itemPrefix+"excerpt", item.Excerpt)
+	}
+}
+
+func diffFingerprint(input []byte) string {
+	sum := sha256.Sum256(input)
+	return "sha256:" + fmt.Sprintf("%x", sum[:])
+}
+
+func nullableString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 func writeFingerprintField(w io.Writer, name, value string) {
@@ -282,6 +389,12 @@ func writeJSON(w io.Writer, result model.Report) error {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
+}
+
+func WriteObligationArtifact(w io.Writer, artifact model.ObligationArtifact) error {
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(artifact)
 }
 
 func writeMarkdown(w io.Writer, diff model.Diff, result model.Report, options Options) error {

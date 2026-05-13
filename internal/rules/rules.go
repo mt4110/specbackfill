@@ -16,90 +16,205 @@ var grpcCodeRE = regexp.MustCompile(`\bcodes\.[A-Z][A-Za-z0-9_]+\b`)
 var durationLiteralRE = regexp.MustCompile(`\b\d+\s*(ms|s|m|h)\b`)
 var cronExpressionRE = regexp.MustCompile(`(?i)["'](?:@(?:annually|yearly|monthly|weekly|daily|midnight|hourly|reboot)|(?:[a-z0-9*/?,lw#-]+\s+){4,6}[a-z0-9*/?,lw#-]+)["']`)
 
-func Evaluate(diff model.Diff, _ model.RepoProfile) []model.Finding {
-	findings := make([]model.Finding, 0, 8)
+func Evaluate(diff model.Diff, repoProfile model.RepoProfile) []model.Finding {
+	return FindingsFromObligations(EvaluateObligations(diff, repoProfile))
+}
 
-	if finding, ok := evaluateDB001(diff); ok {
-		findings = append(findings, finding)
+func EvaluateObligations(diff model.Diff, _ model.RepoProfile) []model.Obligation {
+	obligations := make([]model.Obligation, 0, 8)
+
+	if obligation, ok := evaluateDB001(diff); ok {
+		obligations = append(obligations, obligation)
 	}
-	if finding, ok := evaluateDB002(diff); ok {
-		findings = append(findings, finding)
+	if obligation, ok := evaluateDB002(diff); ok {
+		obligations = append(obligations, obligation)
 	}
-	if finding, ok := evaluateCFG001(diff); ok {
-		findings = append(findings, finding)
+	if obligation, ok := evaluateCFG001(diff); ok {
+		obligations = append(obligations, obligation)
 	}
-	if finding, ok := evaluateAPI001(diff); ok {
-		findings = append(findings, finding)
+	if obligation, ok := evaluateAPI001(diff); ok {
+		obligations = append(obligations, obligation)
 	}
-	if finding, ok := evaluateAUTH001(diff); ok {
-		findings = append(findings, finding)
+	if obligation, ok := evaluateAUTH001(diff); ok {
+		obligations = append(obligations, obligation)
 	}
-	if finding, ok := evaluateERR001(diff); ok {
-		findings = append(findings, finding)
+	if obligation, ok := evaluateERR001(diff); ok {
+		obligations = append(obligations, obligation)
 	}
-	if finding, ok := evaluateOPS001(diff); ok {
-		findings = append(findings, finding)
+	if obligation, ok := evaluateOPS001(diff); ok {
+		obligations = append(obligations, obligation)
 	}
-	if finding, ok := evaluateDOC001(diff); ok {
-		findings = append(findings, finding)
+	if obligation, ok := evaluateDOC001(diff); ok {
+		obligations = append(obligations, obligation)
 	}
 
+	return obligations
+}
+
+func FindingsFromObligations(obligations []model.Obligation) []model.Finding {
+	findings := make([]model.Finding, 0, len(obligations))
+	for _, obligation := range obligations {
+		if obligation.Status != model.ObligationStatusMissing {
+			continue
+		}
+		findings = append(findings, model.Finding{
+			RuleID:             obligation.RuleID,
+			Severity:           obligation.Severity,
+			Confidence:         obligation.Confidence,
+			Title:              obligation.Title,
+			Why:                obligation.Why,
+			Evidence:           obligation.Evidence,
+			ExpectedCompanions: obligation.ExpectedCompanions,
+		})
+	}
 	return findings
 }
 
-func evaluateDB001(diff model.Diff) (model.Finding, bool) {
+type obligationSpec struct {
+	ruleID             string
+	severity           model.Severity
+	confidence         string
+	title              string
+	why                string
+	satisfiedTitle     string
+	satisfiedWhy       string
+	anchorKind         string
+	companionKind      string
+	expectedPaths      []string
+	expectedCompanions []string
+}
+
+func buildObligation(spec obligationSpec, evidence []model.Evidence, status model.ObligationStatus, satisfiers []string) model.Obligation {
+	var line *int
+	if len(evidence) > 0 && evidence[0].Line > 0 {
+		lineValue := evidence[0].Line
+		line = &lineValue
+	}
+
+	anchor := model.ObligationAnchor{
+		Kind:     spec.anchorKind,
+		Evidence: evidence,
+	}
+	if len(evidence) > 0 {
+		anchor.Path = evidence[0].File
+		anchor.Line = line
+	}
+
+	if satisfiers == nil {
+		satisfiers = []string{}
+	}
+
+	title := spec.title
+	why := spec.why
+	if status == model.ObligationStatusSatisfied {
+		if spec.satisfiedTitle != "" {
+			title = spec.satisfiedTitle
+		}
+		if spec.satisfiedWhy != "" {
+			why = spec.satisfiedWhy
+		}
+	}
+
+	return model.Obligation{
+		RuleID:         spec.ruleID,
+		RuleVersion:    "v0",
+		Status:         status,
+		Severity:       spec.severity,
+		Confidence:     spec.confidence,
+		Title:          title,
+		Why:            why,
+		DiffLocalClaim: true,
+		Anchor:         anchor,
+		RequiredCompanions: []model.RequiredCompanion{{
+			Kind:          spec.companionKind,
+			Status:        status,
+			Satisfiers:    satisfiers,
+			ExpectedPaths: spec.expectedPaths,
+		}},
+		Evidence: evidence,
+		Downstream: model.DownstreamMetadata{
+			ImportKind:   "deterministic_static_layer",
+			SourceSignal: "specbackfill",
+		},
+		ExpectedCompanions: spec.expectedCompanions,
+	}
+}
+
+func obligationStatusFromSatisfiers(satisfiers []string) model.ObligationStatus {
+	if len(satisfiers) > 0 {
+		return model.ObligationStatusSatisfied
+	}
+	return model.ObligationStatusMissing
+}
+
+func evaluateDB001(diff model.Diff) (model.Obligation, bool) {
 	evidence := collectEvidence(diff, 3, func(file model.File, line model.Line) bool {
 		return isDB001SchemaPath(file.Path) && isChangedLine(line) && matchesDB001Line(file.Path, line.Text)
 	})
 	if len(evidence) == 0 {
-		return model.Finding{}, false
+		return model.Obligation{}, false
 	}
-	if hasPositiveCompanion(diff, isMigrationPath, extractSearchTerms(evidence), companionTermsMatch) {
-		return model.Finding{}, false
-	}
-
-	return model.Finding{
-		RuleID:     "DB001",
-		Severity:   model.SeverityError,
-		Confidence: "high",
-		Title:      "Schema changed, but no matching migration companion moved with this diff",
-		Why:        "Schema-affecting lines moved in the diff, but no matching migration companion evidence moved with them.",
-		Evidence:   evidence,
-		ExpectedCompanions: []string{
+	satisfiers := collectPositiveCompanionPaths(diff, isMigrationPath, extractSearchTerms(evidence), companionTermsMatch)
+	spec := obligationSpec{
+		ruleID:         "DB001",
+		severity:       model.SeverityError,
+		confidence:     "high",
+		title:          "Schema changed, but no matching migration companion moved with this diff",
+		why:            "Schema-affecting lines moved in the diff, but no matching migration companion evidence moved with them.",
+		satisfiedTitle: "Schema changed and matching migration companion moved with this diff",
+		satisfiedWhy:   "Schema-affecting lines moved in the diff, and matching migration companion evidence moved with them.",
+		anchorKind:     "schema_change",
+		companionKind:  "migration_companion",
+		expectedPaths: []string{
+			"migrations/**",
+			"db/migrations/**",
+			"prisma/migrations/**",
+		},
+		expectedCompanions: []string{
 			"migration file",
 			"migration test",
 			"rollback/backfill note",
 		},
-	}, true
+	}
+	return buildObligation(spec, evidence, obligationStatusFromSatisfiers(satisfiers), satisfiers), true
 }
 
-func evaluateDB002(diff model.Diff) (model.Finding, bool) {
+func evaluateDB002(diff model.Diff) (model.Obligation, bool) {
 	evidence := collectEvidence(diff, 3, func(file model.File, line model.Line) bool {
 		return isDB002TriggerPath(file.Path) && isChangedLine(line) && matchesDB002Line(line.Text)
 	})
 	if len(evidence) == 0 {
-		return model.Finding{}, false
+		return model.Obligation{}, false
 	}
-	if hasPositiveCompanion(diff, isDB002CompanionPath, extractSearchTerms(evidence), companionTermsMatch) {
-		return model.Finding{}, false
-	}
-
-	return model.Finding{
-		RuleID:     "DB002",
-		Severity:   model.SeverityWarn,
-		Confidence: "high",
-		Title:      "Destructive storage change detected, but no matching rollback/backfill companion moved with this diff",
-		Why:        "Destructive storage lines moved in the diff, but no matching rollback note, backfill note, or compatibility test evidence moved with them.",
-		Evidence:   evidence,
-		ExpectedCompanions: []string{
+	satisfiers := collectPositiveCompanionPaths(diff, isDB002CompanionPath, extractSearchTerms(evidence), companionTermsMatch)
+	spec := obligationSpec{
+		ruleID:         "DB002",
+		severity:       model.SeverityWarn,
+		confidence:     "high",
+		title:          "Destructive storage change detected, but no matching rollback/backfill companion moved with this diff",
+		why:            "Destructive storage lines moved in the diff, but no matching rollback note, backfill note, or compatibility test evidence moved with them.",
+		satisfiedTitle: "Destructive storage change detected and matching rollback/backfill companion moved with this diff",
+		satisfiedWhy:   "Destructive storage lines moved in the diff, and matching rollback, backfill, or compatibility-test evidence moved with them.",
+		anchorKind:     "destructive_storage_change",
+		companionKind:  "rollback_backfill_companion",
+		expectedPaths: []string{
+			"docs/**",
+			"README*",
+			"CHANGELOG*",
+			"UPGRADE*",
+			"tests/**",
+			"**/*_test.go",
+		},
+		expectedCompanions: []string{
 			"rollback note",
 			"data backfill note",
 			"compatibility test",
 		},
-	}, true
+	}
+	return buildObligation(spec, evidence, obligationStatusFromSatisfiers(satisfiers), satisfiers), true
 }
 
-func evaluateCFG001(diff model.Diff) (model.Finding, bool) {
+func evaluateCFG001(diff model.Diff) (model.Obligation, bool) {
 	evidence := collectEvidence(diff, 3, func(file model.File, line model.Line) bool {
 		if isCFG001SuppressedPath(file.Path) {
 			return false
@@ -107,11 +222,9 @@ func evaluateCFG001(diff model.Diff) (model.Finding, bool) {
 		return line.Kind == model.LineKindAdded && matchesCFG001Line(line.Text)
 	})
 	if len(evidence) == 0 {
-		return model.Finding{}, false
+		return model.Obligation{}, false
 	}
-	if hasPositiveCompanion(diff, isCFGCompanionPath, extractSearchTerms(evidence), companionTermsMatch) {
-		return model.Finding{}, false
-	}
+	satisfiers := collectPositiveCompanionPaths(diff, isCFGCompanionPath, extractSearchTerms(evidence), companionTermsMatch)
 
 	confidence := "medium"
 	for _, evidenceItem := range evidence {
@@ -121,74 +234,106 @@ func evaluateCFG001(diff model.Diff) (model.Finding, bool) {
 		}
 	}
 
-	return model.Finding{
-		RuleID:     "CFG001",
-		Severity:   model.SeverityWarn,
-		Confidence: confidence,
-		Title:      "New config detected, but no matching docs/default companion moved with this diff",
-		Why:        "A new config/env/flag line moved in the diff, but no matching docs/default companion evidence moved with it.",
-		Evidence:   evidence,
-		ExpectedCompanions: []string{
+	spec := obligationSpec{
+		ruleID:         "CFG001",
+		severity:       model.SeverityWarn,
+		confidence:     confidence,
+		title:          "New config detected, but no matching docs/default companion moved with this diff",
+		why:            "A new config/env/flag line moved in the diff, but no matching docs/default companion evidence moved with it.",
+		satisfiedTitle: "New config detected and matching docs/default companion moved with this diff",
+		satisfiedWhy:   "A new config/env/flag line moved in the diff, and matching docs/default companion evidence moved with it.",
+		anchorKind:     "config_introduction",
+		companionKind:  "config_docs_default_companion",
+		expectedPaths: []string{
+			"README*",
+			"docs/**",
+			".env.example",
+			".env.sample",
+			"config.example*",
+			"examples/**",
+			"sample/**",
+			"samples/**",
+		},
+		expectedCompanions: []string{
 			"docs",
 			"default value handling",
 			"upgrade note",
 		},
-	}, true
+	}
+	return buildObligation(spec, evidence, obligationStatusFromSatisfiers(satisfiers), satisfiers), true
 }
 
-func evaluateAPI001(diff model.Diff) (model.Finding, bool) {
+func evaluateAPI001(diff model.Diff) (model.Obligation, bool) {
 	evidence := collectEvidence(diff, 3, func(file model.File, line model.Line) bool {
 		return isAPI001TriggerPath(file.Path) && isChangedLine(line) && isMeaningfulAPILine(line.Text)
 	})
 	if len(evidence) == 0 {
-		return model.Finding{}, false
+		return model.Obligation{}, false
 	}
-	if hasPositiveCompanion(diff, isAPICompanionPath, extractSearchTerms(evidence), companionTermsMatch) {
-		return model.Finding{}, false
-	}
-
-	return model.Finding{
-		RuleID:     "API001",
-		Severity:   model.SeverityWarn,
-		Confidence: "high",
-		Title:      "Public API changed, but no matching contract-test/docs companion moved with this diff",
-		Why:        "An explicit API spec file moved in the diff, but no matching contract-test/docs companion evidence moved with it.",
-		Evidence:   evidence,
-		ExpectedCompanions: []string{
+	satisfiers := collectPositiveCompanionPaths(diff, isAPICompanionPath, extractSearchTerms(evidence), companionTermsMatch)
+	spec := obligationSpec{
+		ruleID:         "API001",
+		severity:       model.SeverityWarn,
+		confidence:     "high",
+		title:          "Public API changed, but no matching contract-test/docs companion moved with this diff",
+		why:            "An explicit API spec file moved in the diff, but no matching contract-test/docs companion evidence moved with it.",
+		satisfiedTitle: "Public API changed and matching contract-test/docs companion moved with this diff",
+		satisfiedWhy:   "An explicit API spec file moved in the diff, and matching contract-test/docs companion evidence moved with it.",
+		anchorKind:     "public_api_change",
+		companionKind:  "contract_docs_companion",
+		expectedPaths: []string{
+			"docs/**",
+			"README*",
+			"CHANGELOG*",
+			"UPGRADE*",
+			"tests/contract/**",
+			"tests/integration/**",
+			"**/*_test.go",
+		},
+		expectedCompanions: []string{
 			"contract test",
 			"API docs",
 			"compatibility or deprecation note",
 		},
-	}, true
+	}
+	return buildObligation(spec, evidence, obligationStatusFromSatisfiers(satisfiers), satisfiers), true
 }
 
-func evaluateAUTH001(diff model.Diff) (model.Finding, bool) {
+func evaluateAUTH001(diff model.Diff) (model.Obligation, bool) {
 	evidence := collectEvidence(diff, 3, func(file model.File, line model.Line) bool {
 		return isAUTH001TriggerPath(file.Path) && isChangedLine(line) && matchesAUTH001Line(line.Text)
 	})
 	if len(evidence) == 0 {
-		return model.Finding{}, false
+		return model.Obligation{}, false
 	}
-	if hasAUTH001Companion(diff, buildAUTH001CompanionContext(evidence)) {
-		return model.Finding{}, false
-	}
-
-	return model.Finding{
-		RuleID:     "AUTH001",
-		Severity:   model.SeverityWarn,
-		Confidence: "high",
-		Title:      "Authn/Authz branch changed, but no matching allow/deny or security-sensitive note companion moved with this diff",
-		Why:        "Authorization-sensitive lines moved in the diff, but no matching allow/deny test or security-sensitive note evidence moved with them.",
-		Evidence:   evidence,
-		ExpectedCompanions: []string{
+	context := buildAUTH001CompanionContext(evidence)
+	satisfiers := collectAUTH001CompanionPaths(diff, context)
+	spec := obligationSpec{
+		ruleID:         "AUTH001",
+		severity:       model.SeverityWarn,
+		confidence:     "high",
+		title:          "Authn/Authz branch changed, but no matching allow/deny or security-sensitive note companion moved with this diff",
+		why:            "Authorization-sensitive lines moved in the diff, but no matching allow/deny test or security-sensitive note evidence moved with them.",
+		satisfiedTitle: "Authn/Authz branch changed and matching allow/deny or security-sensitive note companion moved with this diff",
+		satisfiedWhy:   "Authorization-sensitive lines moved in the diff, and matching allow/deny test or security-sensitive note evidence moved with them.",
+		anchorKind:     "authz_branch_change",
+		companionKind:  "allow_deny_security_companion",
+		expectedPaths: []string{
+			"tests/**",
+			"**/*_test.go",
+			"docs/**",
+			"security.md",
+		},
+		expectedCompanions: []string{
 			"allow test",
 			"deny test",
 			"security-sensitive note",
 		},
-	}, true
+	}
+	return buildObligation(spec, evidence, obligationStatusFromSatisfiers(satisfiers), satisfiers), true
 }
 
-func evaluateERR001(diff model.Diff) (model.Finding, bool) {
+func evaluateERR001(diff model.Diff) (model.Obligation, bool) {
 	evidence := collectEvidence(diff, 3, func(file model.File, line model.Line) bool {
 		if isERR001SuppressedPath(file.Path) {
 			return false
@@ -196,62 +341,80 @@ func evaluateERR001(diff model.Diff) (model.Finding, bool) {
 		return isChangedLine(line) && matchesERR001Line(line.Text)
 	})
 	if len(evidence) == 0 {
-		return model.Finding{}, false
+		return model.Obligation{}, false
 	}
-	if hasPositiveCompanion(diff, isERR001CompanionPath, extractERR001SearchTerms(evidence), companionTermsMatch) {
-		return model.Finding{}, false
-	}
-
-	return model.Finding{
-		RuleID:     "ERR001",
-		Severity:   model.SeverityWarn,
-		Confidence: "high",
-		Title:      "Public error/status/code contract changed, but no matching assertion-test/docs companion moved with this diff",
-		Why:        "An explicit public error/status/code contract line moved in the diff, but no matching assertion-test/docs companion evidence moved with it.",
-		Evidence:   evidence,
-		ExpectedCompanions: []string{
+	satisfiers := collectPositiveCompanionPaths(diff, isERR001CompanionPath, extractERR001SearchTerms(evidence), companionTermsMatch)
+	spec := obligationSpec{
+		ruleID:         "ERR001",
+		severity:       model.SeverityWarn,
+		confidence:     "high",
+		title:          "Public error/status/code contract changed, but no matching assertion-test/docs companion moved with this diff",
+		why:            "An explicit public error/status/code contract line moved in the diff, but no matching assertion-test/docs companion evidence moved with it.",
+		satisfiedTitle: "Public error/status/code contract changed and matching assertion-test/docs companion moved with this diff",
+		satisfiedWhy:   "An explicit public error/status/code contract line moved in the diff, and matching assertion-test/docs companion evidence moved with it.",
+		anchorKind:     "error_contract_change",
+		companionKind:  "assertion_docs_companion",
+		expectedPaths: []string{
+			"tests/**",
+			"**/*_test.go",
+			"docs/**",
+			"README*",
+			"CHANGELOG*",
+			"UPGRADE*",
+		},
+		expectedCompanions: []string{
 			"assertion test",
 			"API or client note",
 		},
-	}, true
+	}
+	return buildObligation(spec, evidence, obligationStatusFromSatisfiers(satisfiers), satisfiers), true
 }
 
-func evaluateOPS001(diff model.Diff) (model.Finding, bool) {
+func evaluateOPS001(diff model.Diff) (model.Obligation, bool) {
 	evidence := collectEvidence(diff, 3, func(file model.File, line model.Line) bool {
 		return isOPS001TriggerPath(file.Path) && isChangedLine(line) && matchesOPS001Line(file.Path, line.Text)
 	})
 	if len(evidence) == 0 {
-		return model.Finding{}, false
+		return model.Obligation{}, false
 	}
-	if hasOPS001Companion(diff, buildOPS001CompanionContext(evidence)) {
-		return model.Finding{}, false
-	}
+	context := buildOPS001CompanionContext(evidence)
+	satisfiers := collectOPS001CompanionPaths(diff, context)
 
-	return model.Finding{
-		RuleID:     "OPS001",
-		Severity:   model.SeverityWarn,
-		Confidence: "high",
-		Title:      "Worker/queue/retry behavior changed, but no matching observability/runbook companion moved with this diff",
-		Why:        "Operational worker/queue/retry lines moved in the diff, but no matching observability, runbook, or rollback guidance evidence moved with them.",
-		Evidence:   evidence,
-		ExpectedCompanions: []string{
+	spec := obligationSpec{
+		ruleID:         "OPS001",
+		severity:       model.SeverityWarn,
+		confidence:     "high",
+		title:          "Worker/queue/retry behavior changed, but no matching observability/runbook companion moved with this diff",
+		why:            "Operational worker/queue/retry lines moved in the diff, but no matching observability, runbook, or rollback guidance evidence moved with them.",
+		satisfiedTitle: "Worker/queue/retry behavior changed and matching observability/runbook companion moved with this diff",
+		satisfiedWhy:   "Operational worker/queue/retry lines moved in the diff, and matching observability, runbook, or rollback guidance evidence moved with them.",
+		anchorKind:     "ops_behavior_change",
+		companionKind:  "observability_runbook_companion",
+		expectedPaths: []string{
+			"docs/**",
+			"runbooks/**",
+			"playbooks/**",
+			"observability/**",
+			"monitoring/**",
+			"dashboards/**",
+		},
+		expectedCompanions: []string{
 			"observability note",
 			"runbook update",
 			"rollback path",
 		},
-	}, true
+	}
+	return buildObligation(spec, evidence, obligationStatusFromSatisfiers(satisfiers), satisfiers), true
 }
 
-func evaluateDOC001(diff model.Diff) (model.Finding, bool) {
+func evaluateDOC001(diff model.Diff) (model.Obligation, bool) {
 	evidence := collectEvidence(diff, 3, func(file model.File, line model.Line) bool {
 		return isDOC001Path(file.Path) && isChangedLine(line) && isMeaningfulGeneratedLine(line.Text)
 	})
 	if len(evidence) == 0 {
-		return model.Finding{}, false
+		return model.Obligation{}, false
 	}
-	if hasPositiveCompanion(diff, isDocCompanionPath, extractSearchTerms(evidence), companionTermsMatch) {
-		return model.Finding{}, false
-	}
+	satisfiers := collectPositiveCompanionPaths(diff, isDocCompanionPath, extractSearchTerms(evidence), companionTermsMatch)
 
 	severity := model.SeverityInfo
 	confidence := "medium"
@@ -263,18 +426,28 @@ func evaluateDOC001(diff model.Diff) (model.Finding, bool) {
 		}
 	}
 
-	return model.Finding{
-		RuleID:     "DOC001",
-		Severity:   severity,
-		Confidence: confidence,
-		Title:      "Generated spec/client changed, but no matching human-facing explanation moved with this diff",
-		Why:        "A generated API/spec client artifact moved in the diff, but no matching human-facing explanation evidence moved with it.",
-		Evidence:   evidence,
-		ExpectedCompanions: []string{
+	spec := obligationSpec{
+		ruleID:         "DOC001",
+		severity:       severity,
+		confidence:     confidence,
+		title:          "Generated spec/client changed, but no matching human-facing explanation moved with this diff",
+		why:            "A generated API/spec client artifact moved in the diff, but no matching human-facing explanation evidence moved with it.",
+		satisfiedTitle: "Generated spec/client changed and matching human-facing explanation moved with this diff",
+		satisfiedWhy:   "A generated API/spec client artifact moved in the diff, and matching human-facing explanation evidence moved with it.",
+		anchorKind:     "generated_spec_change",
+		companionKind:  "human_explanation_companion",
+		expectedPaths: []string{
+			"docs/**",
+			"README*",
+			"CHANGELOG*",
+			"UPGRADE*",
+		},
+		expectedCompanions: []string{
 			"human docs",
 			"upgrade note",
 		},
-	}, true
+	}
+	return buildObligation(spec, evidence, obligationStatusFromSatisfiers(satisfiers), satisfiers), true
 }
 
 func collectEvidence(diff model.Diff, limit int, match func(model.File, model.Line) bool) []model.Evidence {
@@ -556,18 +729,27 @@ type auth001CompanionContext struct {
 }
 
 func hasAUTH001Companion(diff model.Diff, context auth001CompanionContext) bool {
+	return len(collectAUTH001CompanionPaths(diff, context)) > 0
+}
+
+func collectAUTH001CompanionPaths(diff model.Diff, context auth001CompanionContext) []string {
+	paths := make([]string, 0, 2)
 	hasAllow := false
 	hasDeny := false
+	allowPaths := make([]string, 0, 1)
+	denyPaths := make([]string, 0, 1)
 
 	for _, file := range diff.Files {
 		if file.Status == model.FileStatusDeleted {
 			continue
 		}
 		if isAUTH001MetadataCompanionMove(file, context) {
-			return true
+			paths = appendUniquePath(paths, file.Path)
+			continue
 		}
 		if isAUTH001SecurityNotePath(file.Path) && fileHasAUTH001SecurityNote(file, context) {
-			return true
+			paths = appendUniquePath(paths, file.Path)
+			continue
 		}
 		if !isAUTH001TestPath(file.Path) {
 			continue
@@ -582,18 +764,26 @@ func hasAUTH001Companion(diff model.Diff, context auth001CompanionContext) bool 
 				}
 				if isAUTH001AllowLine(line.Text) {
 					hasAllow = true
+					allowPaths = appendUniquePath(allowPaths, file.Path)
 				}
 				if isAUTH001DenyLine(line.Text) {
 					hasDeny = true
-				}
-				if hasAllow && hasDeny {
-					return true
+					denyPaths = appendUniquePath(denyPaths, file.Path)
 				}
 			}
 		}
 	}
 
-	return false
+	if hasAllow && hasDeny {
+		for _, path := range allowPaths {
+			paths = appendUniquePath(paths, path)
+		}
+		for _, path := range denyPaths {
+			paths = appendUniquePath(paths, path)
+		}
+	}
+
+	return paths
 }
 
 func buildAUTH001CompanionContext(evidence []model.Evidence) auth001CompanionContext {
@@ -1097,18 +1287,24 @@ type ops001CompanionContext struct {
 }
 
 func hasOPS001Companion(diff model.Diff, context ops001CompanionContext) bool {
+	return len(collectOPS001CompanionPaths(diff, context)) > 0
+}
+
+func collectOPS001CompanionPaths(diff model.Diff, context ops001CompanionContext) []string {
+	paths := make([]string, 0, 2)
 	for _, file := range diff.Files {
 		if file.Status == model.FileStatusDeleted || !isOPS001CompanionPath(file.Path) {
 			continue
 		}
 		if isMetadataOnlyCompanionMove(file) && isOPS001CompanionPathRelated(file.Path, context) {
-			return true
+			paths = appendUniquePath(paths, file.Path)
+			continue
 		}
 		if fileHasOPS001Companion(file, context) {
-			return true
+			paths = appendUniquePath(paths, file.Path)
 		}
 	}
-	return false
+	return paths
 }
 
 func buildOPS001CompanionContext(evidence []model.Evidence) ops001CompanionContext {
@@ -1498,19 +1694,30 @@ func isCommentLike(text string) bool {
 	return trimmed == "*" || strings.HasPrefix(trimmed, "* ")
 }
 
-func hasPositiveCompanion(diff model.Diff, pathMatch func(string) bool, terms []string, lineMatch func(model.File, model.Line, []string) bool) bool {
+func collectPositiveCompanionPaths(diff model.Diff, pathMatch func(string) bool, terms []string, lineMatch func(model.File, model.Line, []string) bool) []string {
+	paths := make([]string, 0, 2)
 	for _, file := range diff.Files {
 		if !pathMatch(file.Path) || file.Status == model.FileStatusDeleted {
 			continue
 		}
 		if isMetadataOnlyCompanionMove(file) {
-			return true
+			paths = appendUniquePath(paths, file.Path)
+			continue
 		}
 		if fileHasPositiveChange(file, terms, lineMatch) {
-			return true
+			paths = appendUniquePath(paths, file.Path)
 		}
 	}
-	return false
+	return paths
+}
+
+func appendUniquePath(paths []string, filePath string) []string {
+	for _, existing := range paths {
+		if existing == filePath {
+			return paths
+		}
+	}
+	return append(paths, filePath)
 }
 
 func isMetadataOnlyCompanionMove(file model.File) bool {

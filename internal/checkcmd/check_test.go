@@ -3,10 +3,13 @@ package checkcmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mt4110/specbackfill/internal/model"
 )
 
 func TestRunInvalidFlagCombinations(t *testing.T) {
@@ -145,6 +148,97 @@ func TestRunDiffFileJSON(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), `"version": "v0"`) {
 		t.Fatalf("stdout = %q, want JSON skeleton", stdout.String())
+	}
+}
+
+func TestRunEmitObligationsJSON(t *testing.T) {
+	t.Parallel()
+
+	fixture := writeFixtureCopy(t, "db001_positive.diff")
+	for _, args := range [][]string{
+		{"--diff-file", fixture, "--emit-obligations", "--fail-on", "off"},
+		{"--diff-file", fixture, "--emit-obligations", "--format", "json", "--fail-on", "off"},
+	} {
+		args := args
+		t.Run(strings.Join(args, "_"), func(t *testing.T) {
+			t.Parallel()
+
+			artifact, code, stderr := runCheckObligations(t, t.TempDir(), args)
+			if code != 0 {
+				t.Fatalf("Run() code = %d, want 0; stderr=%q", code, stderr)
+			}
+			if stderr != "" {
+				t.Fatalf("stderr = %q, want empty", stderr)
+			}
+			if artifact.SchemaVersion != "obligations.v1" {
+				t.Fatalf("SchemaVersion = %q, want obligations.v1", artifact.SchemaVersion)
+			}
+			if len(artifact.Obligations) != 1 {
+				t.Fatalf("len(obligations) = %d, want 1", len(artifact.Obligations))
+			}
+			obligation := artifact.Obligations[0]
+			if obligation.RuleID != "DB001" || obligation.Status != "missing" {
+				t.Fatalf("obligation = %+v, want DB001 missing", obligation)
+			}
+			if obligation.FindingID == nil {
+				t.Fatalf("missing obligation did not link to finding ID: %+v", obligation)
+			}
+			if obligation.Anchor.Path == "" || len(obligation.Anchor.Evidence) == 0 {
+				t.Fatalf("missing obligation lacks anchor evidence: %+v", obligation)
+			}
+		})
+	}
+}
+
+func TestRunEmitObligationsCannotCombineWithSummary(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "summary",
+			args: []string{"--emit-obligations", "--summary"},
+			want: "--emit-obligations cannot be combined with --summary",
+		},
+		{
+			name: "explain",
+			args: []string{"--emit-obligations", "--explain"},
+			want: "--emit-obligations cannot be combined with --explain",
+		},
+		{
+			name: "text format",
+			args: []string{"--emit-obligations", "--format", "text"},
+			want: "--emit-obligations can only be combined with --format json",
+		},
+		{
+			name: "markdown format",
+			args: []string{"--emit-obligations", "--format", "markdown"},
+			want: "--emit-obligations can only be combined with --format json",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+
+			code := Run(context.Background(), t.TempDir(), tc.args, &stdout, &stderr)
+			if code != 2 {
+				t.Fatalf("Run() code = %d, want 2", code)
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("stdout = %q, want empty", stdout.String())
+			}
+			if !strings.Contains(stderr.String(), tc.want) {
+				t.Fatalf("stderr = %q, want %q", stderr.String(), tc.want)
+			}
+		})
 	}
 }
 
@@ -370,4 +464,15 @@ func TestRunFailOnModesWithoutRules(t *testing.T) {
 			}
 		})
 	}
+}
+
+func runCheckObligations(t *testing.T, cwd string, args []string) (model.ObligationArtifact, int, string) {
+	t.Helper()
+
+	stdout, code, stderr := runCheckOutput(t, cwd, args)
+	var artifact model.ObligationArtifact
+	if err := json.Unmarshal([]byte(stdout), &artifact); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v\nraw=%s", err, stdout)
+	}
+	return artifact, code, stderr
 }

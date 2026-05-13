@@ -35,11 +35,11 @@ A diff-local omission finding is a claim of the following form:
 
 The tool MUST NOT claim repository-wide truth when only diff-local evidence is available.
 
-For current v0, `specbackfill check` MUST preserve the existing finding-oriented CLI contract. The obligation-first model defines product semantics and future artifact boundaries; it does not by itself require a full obligation/status JSON output unless a later phase explicitly adds and versions that output.
+For current v0, `specbackfill check` MUST preserve the existing finding-oriented CLI contract. The obligation-first model defines product semantics and artifact boundaries. The explicit `--emit-obligations` mode emits a separately versioned obligation/status JSON artifact and MUST NOT remove or silently reinterpret the normal findings JSON contract.
 
 ### 2.1 Obligation status boundary
 
-A future explicit obligation artifact MAY classify companion obligations with these statuses:
+An explicit obligation artifact MAY classify companion obligations with these statuses:
 
 | Status | Meaning |
 | --- | --- |
@@ -50,7 +50,7 @@ A future explicit obligation artifact MAY classify companion obligations with th
 
 Status terms MUST remain diff-local. `unknown` MUST NOT be reported as `missing`. `suppressed` MUST be explainable when an implementation exposes suppression diagnostics.
 
-Until a versioned obligation artifact exists, user-facing findings are the unresolved `missing` side of the obligation model. They MUST keep the required finding fields defined in this document.
+Normal user-facing findings are the unresolved `missing` side of the obligation model. They MUST keep the required finding fields defined in this document.
 
 ### Allowed wording
 
@@ -125,6 +125,7 @@ specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
                   [--fail-on error|warn|off]
                   [--summary]
                   [--explain]
+                  [--emit-obligations]
 ```
 
 ### 4.2 Rule discovery commands
@@ -191,6 +192,14 @@ v0 MUST support the following formats:
 `--summary` MAY render summary-only output for the selected format. Summary mode
 MUST NOT change rule evaluation, finding identity, or exit-code threshold
 behavior.
+
+`--emit-obligations` MUST render a versioned obligation artifact as JSON. It is
+an explicit output mode separate from `--format json`; the normal `json` format
+MUST remain finding-oriented and backward compatible. `--emit-obligations` MUST
+NOT change rule evaluation or exit-code threshold behavior.
+`--emit-obligations` MAY be combined with `--format json` for caller clarity,
+but MUST NOT be combined with `--format text`, `--format markdown`, `--summary`,
+or `--explain`.
 
 ### 4.6 Severity threshold
 
@@ -456,9 +465,9 @@ Recommended shape:
 ### 8.2 JSON output
 
 `json` output MUST be machine-usable and SHOULD have a stable top-level shape.
-The current v0 JSON contract is finding-oriented. A future full obligation
-artifact MUST be explicitly versioned and MUST NOT remove or silently reinterpret
-the required finding fields defined by this document.
+The normal v0 JSON contract is finding-oriented. The obligation artifact is a
+separate explicit output mode and MUST NOT remove or silently reinterpret the
+required finding fields defined by this document.
 
 Recommended structure:
 
@@ -516,14 +525,47 @@ When `--explain` is enabled, JSON output MAY include an additive top-level `expl
 
 The `findings` array remains the deterministic machine contract. Explanations MUST preserve rule IDs, evidence references, and expected companion categories.
 
-If a later phase adds a full obligation artifact, it MUST preserve all of the
-following boundaries:
+### 8.2.1 Obligation artifact output
+
+When `--emit-obligations` is enabled, `specbackfill check` MUST emit a JSON
+artifact with this top-level shape:
+
+```json
+{
+  "schema_version": "obligations.v1",
+  "tool": {
+    "name": "specbackfill",
+    "version": "v0"
+  },
+  "run": {
+    "run_id": "run-...",
+    "input_kind": "diff_file",
+    "base": null,
+    "head": null,
+    "diff_fingerprint": "sha256:..."
+  },
+  "obligations": []
+}
+```
+
+The artifact schema is `schemas/obligations.schema.json`. Each obligation MUST
+include at least:
+
+- `obligation_id`
+- `rule_id`
+- `status`
+- `anchor`
+- `required_companions`
+- `evidence`
+- `diff_local_claim`
+
+The artifact MUST preserve all of the following boundaries:
 
 - deterministic obligation IDs
 - deterministic rule IDs
 - diff-local anchor evidence
 - companion status values with no repository-wide absence claims
-- versioned schema or output mode
+- versioned schema and explicit output mode
 - downstream-safe separation from AI findings and review-comment routing
 
 ### 8.3 Markdown output
@@ -834,6 +876,8 @@ v0 SHOULD be validated with golden diff fixtures.
 - companion artifacts already touched in the same diff
 
 The implementation SHOULD keep text and JSON summaries semantically aligned.
+The implementation SHOULD cover obligation artifact JSON with golden fixtures
+for positive, companion-present, and nearby negative diffs.
 The implementation SHOULD behave consistently across working-tree, git-range, and diff-file inputs.
 
 ## 12. AI Behavior
@@ -867,8 +911,9 @@ A conforming v0 implementation of `specbackfill` MUST:
 11. support summary-only output without changing rule evaluation
 12. support fixture coverage visibility for repository maintainers
 13. include deterministic omission signatures for emitted findings
-14. treat findings as unresolved companion obligations without requiring an unversioned obligation artifact
-15. remain phase-limited and conservative in scope
+14. treat findings as unresolved companion obligations
+15. support explicit versioned obligation artifact output without changing normal findings JSON
+16. remain phase-limited and conservative in scope
 
 The quality bar for this product is not breadth.
 It is **precision, explicitness, and honesty about what the diff can actually support**.

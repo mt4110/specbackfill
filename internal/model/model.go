@@ -32,6 +32,15 @@ const (
 	SeverityInfo  Severity = "info"
 )
 
+type ObligationStatus string
+
+const (
+	ObligationStatusSatisfied  ObligationStatus = "satisfied"
+	ObligationStatusMissing    ObligationStatus = "missing"
+	ObligationStatusUnknown    ObligationStatus = "unknown"
+	ObligationStatusSuppressed ObligationStatus = "suppressed"
+)
+
 type Diff struct {
 	Files []File
 }
@@ -125,6 +134,70 @@ type Explanation struct {
 	Summary            string     `json:"summary"`
 	Evidence           []Evidence `json:"evidence"`
 	ExpectedCompanions []string   `json:"expected_companions"`
+}
+
+type ObligationArtifact struct {
+	SchemaVersion string       `json:"schema_version"`
+	Tool          ToolMetadata `json:"tool"`
+	Run           RunMetadata  `json:"run"`
+	Obligations   []Obligation `json:"obligations"`
+}
+
+type ToolMetadata struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
+type RunMetadata struct {
+	RunID           string  `json:"run_id"`
+	InputKind       string  `json:"input_kind"`
+	Base            *string `json:"base"`
+	Head            *string `json:"head"`
+	DiffFingerprint string  `json:"diff_fingerprint"`
+}
+
+type Obligation struct {
+	ObligationID       string                 `json:"obligation_id"`
+	FindingID          *string                `json:"finding_id"`
+	OmissionSignature  *string                `json:"omission_signature"`
+	RuleID             string                 `json:"rule_id"`
+	RuleVersion        string                 `json:"rule_version"`
+	Status             ObligationStatus       `json:"status"`
+	Severity           Severity               `json:"severity"`
+	Confidence         string                 `json:"confidence"`
+	Title              string                 `json:"title"`
+	Why                string                 `json:"why"`
+	DiffLocalClaim     bool                   `json:"diff_local_claim"`
+	Anchor             ObligationAnchor       `json:"anchor"`
+	RequiredCompanions []RequiredCompanion    `json:"required_companions"`
+	Evidence           []Evidence             `json:"evidence"`
+	Suppression        *ObligationSuppression `json:"suppression"`
+	Downstream         DownstreamMetadata     `json:"downstream"`
+	ExpectedCompanions []string               `json:"-"`
+}
+
+type ObligationAnchor struct {
+	Kind     string     `json:"kind"`
+	Path     string     `json:"path"`
+	Line     *int       `json:"line"`
+	Evidence []Evidence `json:"evidence"`
+}
+
+type RequiredCompanion struct {
+	Kind          string           `json:"kind"`
+	Status        ObligationStatus `json:"status"`
+	Satisfiers    []string         `json:"satisfiers"`
+	ExpectedPaths []string         `json:"expected_paths"`
+}
+
+type ObligationSuppression struct {
+	Reason   string     `json:"reason"`
+	Evidence []Evidence `json:"evidence"`
+}
+
+type DownstreamMetadata struct {
+	ImportKind   string `json:"import_kind"`
+	SourceSignal string `json:"source_signal"`
 }
 
 type Evidence struct {

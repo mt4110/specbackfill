@@ -148,6 +148,122 @@ func TestEvaluateFixtures(t *testing.T) {
 	}
 }
 
+func TestEvaluateObligationsStatuses(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		file       string
+		wantRule   string
+		wantStatus model.ObligationStatus
+		wantCount  int
+	}{
+		{
+			name:       "positive missing obligation",
+			file:       "db001_positive.diff",
+			wantRule:   "DB001",
+			wantStatus: model.ObligationStatusMissing,
+			wantCount:  1,
+		},
+		{
+			name:       "companion-present satisfied obligation",
+			file:       "db001_companion.diff",
+			wantRule:   "DB001",
+			wantStatus: model.ObligationStatusSatisfied,
+			wantCount:  1,
+		},
+		{
+			name:      "negative migration-only emits no obligation",
+			file:      "db001_migration_only.diff",
+			wantCount: 0,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			obligations := EvaluateObligations(parseFixture(t, tc.file), model.RepoProfile{})
+			if len(obligations) != tc.wantCount {
+				t.Fatalf("len(obligations) = %d, want %d: %+v", len(obligations), tc.wantCount, obligations)
+			}
+			if tc.wantCount == 0 {
+				return
+			}
+
+			obligation := obligations[0]
+			if obligation.RuleID != tc.wantRule || obligation.Status != tc.wantStatus {
+				t.Fatalf("obligation = %+v, want rule %s status %s", obligation, tc.wantRule, tc.wantStatus)
+			}
+			if !obligation.DiffLocalClaim {
+				t.Fatalf("DiffLocalClaim = false, want true")
+			}
+			if obligation.Anchor.Path == "" || len(obligation.Anchor.Evidence) == 0 || len(obligation.Evidence) == 0 {
+				t.Fatalf("obligation missing anchor evidence: %+v", obligation)
+			}
+			if len(obligation.RequiredCompanions) == 0 {
+				t.Fatalf("obligation missing required companions: %+v", obligation)
+			}
+			if obligation.RequiredCompanions[0].Status != tc.wantStatus {
+				t.Fatalf("required companion status = %s, want %s", obligation.RequiredCompanions[0].Status, tc.wantStatus)
+			}
+			if tc.wantStatus == model.ObligationStatusSatisfied && len(obligation.RequiredCompanions[0].Satisfiers) == 0 {
+				t.Fatalf("satisfied obligation missing satisfiers: %+v", obligation)
+			}
+		})
+	}
+}
+
+func TestSatisfiedObligationSatisfiersAreSpecificCompanionPaths(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name      string
+		file      string
+		wantRule  string
+		wantPaths []string
+	}{
+		{
+			name:     "auth allow deny",
+			file:     "auth001_companion.diff",
+			wantRule: "AUTH001",
+			wantPaths: []string{
+				"internal/auth/permissions_test.go",
+			},
+		},
+		{
+			name:     "ops runbook",
+			file:     "ops001_companion.diff",
+			wantRule: "OPS001",
+			wantPaths: []string{
+				"docs/runbooks/billing-worker.md",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			obligations := EvaluateObligations(parseFixture(t, tc.file), model.RepoProfile{})
+			if len(obligations) != 1 {
+				t.Fatalf("len(obligations) = %d, want 1: %+v", len(obligations), obligations)
+			}
+
+			obligation := obligations[0]
+			if obligation.RuleID != tc.wantRule || obligation.Status != model.ObligationStatusSatisfied {
+				t.Fatalf("obligation = %+v, want %s satisfied", obligation, tc.wantRule)
+			}
+			gotPaths := obligation.RequiredCompanions[0].Satisfiers
+			if !reflect.DeepEqual(gotPaths, tc.wantPaths) {
+				t.Fatalf("satisfiers = %v, want %v", gotPaths, tc.wantPaths)
+			}
+		})
+	}
+}
+
 func TestFindingsIncludeRequiredFields(t *testing.T) {
 	t.Parallel()
 
@@ -181,6 +297,56 @@ func TestFindingsIncludeRequiredFields(t *testing.T) {
 			}
 			if len(finding.ExpectedCompanions) == 0 {
 				t.Fatalf("expected companions missing: %+v", finding)
+			}
+		})
+	}
+}
+
+func TestMissingObligationsIncludeRequiredFields(t *testing.T) {
+	t.Parallel()
+
+	fixtures := []string{
+		"db001_positive.diff",
+		"db002_positive.diff",
+		"cfg001_positive.diff",
+		"api001_positive.diff",
+		"auth001_positive.diff",
+		"err001_positive.diff",
+		"ops001_positive.diff",
+		"doc001_positive.diff",
+	}
+
+	for _, fixture := range fixtures {
+		fixture := fixture
+		t.Run(fixture, func(t *testing.T) {
+			t.Parallel()
+
+			obligations := EvaluateObligations(parseFixture(t, fixture), model.RepoProfile{})
+			if len(obligations) != 1 {
+				t.Fatalf("len(obligations) = %d, want 1", len(obligations))
+			}
+
+			obligation := obligations[0]
+			if obligation.Status != model.ObligationStatusMissing {
+				t.Fatalf("obligation.Status = %s, want missing", obligation.Status)
+			}
+			if obligation.RuleID == "" || obligation.Severity == "" || obligation.Confidence == "" || obligation.Title == "" || obligation.Why == "" {
+				t.Fatalf("obligation has empty required scalar field: %+v", obligation)
+			}
+			if !obligation.DiffLocalClaim {
+				t.Fatalf("DiffLocalClaim = false, want true")
+			}
+			if obligation.Anchor.Kind == "" || obligation.Anchor.Path == "" || len(obligation.Anchor.Evidence) == 0 {
+				t.Fatalf("obligation missing anchor evidence: %+v", obligation)
+			}
+			if len(obligation.Evidence) == 0 || len(obligation.Evidence) > 3 {
+				t.Fatalf("len(obligation.Evidence) = %d, want 1..3", len(obligation.Evidence))
+			}
+			if len(obligation.RequiredCompanions) == 0 {
+				t.Fatalf("required companions missing: %+v", obligation)
+			}
+			if obligation.RequiredCompanions[0].Status != model.ObligationStatusMissing {
+				t.Fatalf("required companion status = %s, want missing", obligation.RequiredCompanions[0].Status)
 			}
 		})
 	}
