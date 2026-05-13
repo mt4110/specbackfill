@@ -8,10 +8,11 @@ HEAD ?= HEAD
 DIFF ?=
 FORMAT ?= text
 RULE ?= DB001
+PILOT_SCORECARD ?= examples/pilot_scorecard.sample.csv
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install trial test check pr patch summary json md rules rule fixtures
+.PHONY: help install trial test check pr patch summary json md rules rule fixtures pilot-eval
 
 help:
 	@printf '%s\n' \
@@ -27,6 +28,7 @@ help:
 		'  make rules                  List implemented rules' \
 		'  make rule [RULE=DB001]      Show one rule' \
 		'  make fixtures               Show fixture coverage' \
+		'  make pilot-eval [PILOT_SCORECARD=...]  Evaluate a pilot scorecard CSV' \
 		'  make test                   Run tests'
 
 install:
@@ -72,6 +74,8 @@ trial:
 
 test:
 	@mise run test
+	@python3 -m unittest scripts/evaluate_pilot_test.py
+	@python3 scripts/evaluate_pilot.py examples/pilot_scorecard.sample.csv --allow-small-sample --local-ai-review-import yes >/dev/null
 
 check:
 	@$(SPECBACKFILL) check --fail-on off
@@ -100,3 +104,6 @@ rule:
 
 fixtures:
 	@$(SPECBACKFILL) fixtures report
+
+pilot-eval:
+	@python3 scripts/evaluate_pilot.py "$(PILOT_SCORECARD)"

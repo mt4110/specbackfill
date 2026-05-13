@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mt4110/specbackfill/blob/main/schemas/pilot_scorecard.schema.json",
+  "title": "specbackfill pilot scorecard record",
+  "description": "Public-safe normalized record for scoring deterministic companion obligations over real-diff pilots. Store only anonymized labels, operator verdicts, and aggregate-safe notes; do not store raw private diffs, PR bodies, review text, personal data, or secrets.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "sample_id",
+    "source_label",
+    "sample_ref",
+    "rule_id",
+    "obligation_id",
+    "status",
+    "severity",
+    "operator_verdict",
+    "fp_reason",
+    "was_actioned",
+    "duplicate_with_local_ai_review",
+    "duplicate_with_review_firewall",
+    "evidence_ok",
+    "status_reason_ok",
+    "notes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pilot_scorecard.v1"
+    },
+    "sample_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable anonymized row ID for the pilot sample."
+    },
+    "source_label": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Opaque repository or corpus label. Do not use private repository names unless the scorecard stays local."
+    },
+    "sample_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Opaque PR, diff, or changed-file-group label."
+    },
+    "rule_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "obligation_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Deterministic obligation ID, normally from obligations.v1 or local_ai_review_import.v1."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "satisfied",
+        "missing",
+        "unknown",
+        "suppressed"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warn",
+        "error",
+        "unknown"
+      ]
+    },
+    "operator_verdict": {
+      "type": "string",
+      "enum": [
+        "useful_fixed",
+        "useful_noted",
+        "covered_by_existing_safeguard",
+        "false_positive",
+        "unclear",
+        "duplicate_with_local_ai_review",
+        "duplicate_with_review_firewall",
+        "not_actionable"
+      ]
+    },
+    "fp_reason": {
+      "type": "string",
+      "enum": [
+        "",
+        "ambiguous_anchor",
+        "companion_present_not_recognized",
+        "docs_only",
+        "example_only",
+        "generated_only",
+        "migration_only",
+        "not_diff_local",
+        "sample_only",
+        "severity_too_high",
+        "tests_only",
+        "unrelated_companion",
+        "other"
+      ]
+    },
+    "was_actioned": {
+      "$ref": "#/$defs/csv_boolean"
+    },
+    "duplicate_with_local_ai_review": {
+      "$ref": "#/$defs/csv_boolean"
+    },
+    "duplicate_with_review_firewall": {
+      "$ref": "#/$defs/csv_boolean"
+    },
+    "evidence_ok": {
+      "$ref": "#/$defs/csv_boolean",
+      "description": "True when the row's deterministic output had concrete diff-local evidence the operator could inspect."
+    },
+    "status_reason_ok": {
+      "$ref": "#/$defs/csv_boolean",
+      "description": "True when satisfied/suppressed status reasons were visible enough to score. Use true for missing rows unless status explanation was confusing."
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 240,
+      "description": "Short public-safe note. Do not include raw private review text or private diff excerpts."
+    }
+  },
+  "$defs": {
+    "csv_boolean": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string",
+          "enum": [
+            "1",
+            "0",
+            "true",
+            "false",
+            "yes",
+            "no",
+            "y",
+            "n"
+          ]
+        }
+      ]
+    }
+  },
+  "additionalProperties": true
+}

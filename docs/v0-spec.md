@@ -956,6 +956,43 @@ The implementation SHOULD cover obligation artifact JSON with golden fixtures
 for positive, companion-present, and nearby negative diffs.
 The implementation SHOULD behave consistently across working-tree, git-range, and diff-file inputs.
 
+### 11.1 Pilot scorecard contract
+
+v0 MAY include a public-safe pilot scorecard workflow for evaluating
+deterministic obligation output over real diffs before tightening CI behavior or
+adding rules for breadth.
+
+The scorecard contract is `pilot_scorecard.v1`, described by
+`schemas/pilot_scorecard.schema.json`. A scorecard row represents a human
+operator verdict for one deterministic obligation or imported deterministic
+item. The public sample CSV is synthetic and lives at
+`examples/pilot_scorecard.sample.csv`.
+
+The scorecard SHOULD measure at least:
+
+- useful obligations (`useful_fixed` and `useful_noted`)
+- false positives and false-positive reasons
+- duplicate coverage with `local-ai-review`
+- duplicate coverage with `review-firewall`
+- diff-local evidence coverage through `evidence_ok`
+- deterministic obligation ID coverage
+- satisfied or suppressed status-reason clarity
+- whether the `local_ai_review_import.v1` path was exercised
+
+The evaluator script `scripts/evaluate_pilot.py` MAY compute a decision of
+`continue`, `continue_advisory_only`, or `archive` from scorecard rows and
+operator-provided integration flags. That decision is an evaluation result, not
+a change to `specbackfill check` exit semantics.
+
+Pilot scorecards committed to the public repository MUST be public-safe. They
+MUST NOT include raw private diffs, private PR bodies, private review text,
+secrets, personal data, or proprietary repository names. Real pilot scorecards
+SHOULD stay local unless they have been reduced to public-safe aggregate rows.
+
+The pilot workflow MUST NOT add AI/LLM detection, PR comment posting,
+`local-ai-review` review-history storage, `review-firewall` triage/routing, new
+companion rules, or stricter default CI failure behavior.
+
 ## 12. AI Behavior
 
 AI is out of scope for the detection core in v0.

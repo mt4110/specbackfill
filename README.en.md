@@ -159,6 +159,7 @@ make summary
 make rules
 make rule RULE=DB001
 make fixtures
+make pilot-eval
 ```
 
 `make trial` is a self-check for this repository. To check another project, install the command with `make install`, then run `specbackfill check --fail-on off` from that project's root.
@@ -178,6 +179,18 @@ Start with `specbackfill check --fail-on off` or an equivalent advisory check su
 - `make trial`, or `make test` and `make fixtures`, is checked before moving into quality changes
 
 If the same noisy pattern repeats, harden fixtures and suppressions in a small slice before turning the check into a blocking gate.
+
+## Pilot Scorecard
+
+Before turning this into a blocking check, score deterministic obligation output over real diffs. The public repository keeps only anonymized synthetic samples; do not commit real PR bodies, private review text, personal data, or raw private diffs.
+
+```bash
+specbackfill check --diff-file change.diff --emit-obligations --fail-on off > obligations.json
+specbackfill check --diff-file change.diff --emit-local-ai-review-import --fail-on off > specbackfill-import.jsonl
+python3 scripts/evaluate_pilot.py examples/pilot_scorecard.sample.csv --allow-small-sample --local-ai-review-import yes
+```
+
+The scorecard contract is [schemas/pilot_scorecard.schema.json](./schemas/pilot_scorecard.schema.json), and the synthetic sample is [examples/pilot_scorecard.sample.csv](./examples/pilot_scorecard.sample.csv). The evaluator returns one decision: `continue`, `continue_advisory_only`, or `archive`. `--allow-small-sample` is for sample verification; a real pilot should use at least 30 rows.
 
 ## Implemented Rules
 
