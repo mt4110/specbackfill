@@ -5,8 +5,10 @@
 | Status | v0 normative source of truth |
 | Product | `specbackfill` |
 | Primary command | `specbackfill check` |
+| Product identity | deterministic change-contract compiler |
+| Core concept | companion obligation |
 | Detection core | rule-based |
-| Finding semantics | diff-local omission |
+| Finding semantics | diff-local omission for unresolved companion obligations |
 | Repository note | This repository is phase-limited. This document defines the intended v0 contract; it does not prove implementation completeness. |
 
 This document defines the normative v0 behavior for `specbackfill`.
@@ -21,13 +23,34 @@ The key words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** ar
 
 ## 2. Product Definition
 
-`specbackfill` is a CLI that analyzes code diffs and emits findings about **diff-local omissions**.
+`specbackfill` is a CLI and deterministic change-contract compiler for git diffs.
 
-A diff-local omission is a claim of the following form:
+It analyzes changed anchors in a diff, infers **companion obligations** that those changes appear to create, and reports unresolved obligations as **diff-local omission** findings.
+
+A companion obligation is a rule-derived expectation that one or more companion artifact categories should move with a changed anchor in the same diff.
+
+A diff-local omission finding is a claim of the following form:
 
 > This diff appears to change something that normally requires companion artifacts, but the relevant companions did not move in the same diff.
 
 The tool MUST NOT claim repository-wide truth when only diff-local evidence is available.
+
+For current v0, `specbackfill check` MUST preserve the existing finding-oriented CLI contract. The obligation-first model defines product semantics and future artifact boundaries; it does not by itself require a full obligation/status JSON output unless a later phase explicitly adds and versions that output.
+
+### 2.1 Obligation status boundary
+
+A future explicit obligation artifact MAY classify companion obligations with these statuses:
+
+| Status | Meaning |
+| --- | --- |
+| `satisfied` | companion evidence moved in the same diff |
+| `missing` | required companion evidence did not move in the same diff |
+| `unknown` | the diff created an anchor, but the rule cannot confidently decide companion status from diff evidence alone |
+| `suppressed` | the rule matched an anchor, but a documented suppression or negative condition prevents an unresolved finding |
+
+Status terms MUST remain diff-local. `unknown` MUST NOT be reported as `missing`. `suppressed` MUST be explainable when an implementation exposes suppression diagnostics.
+
+Until a versioned obligation artifact exists, user-facing findings are the unresolved `missing` side of the obligation model. They MUST keep the required finding fields defined in this document.
 
 ### Allowed wording
 
@@ -79,12 +102,18 @@ v0 MUST remain usable with diff input alone.
 `specbackfill` is not `local-ai-review` and MUST NOT become a broad AI review
 system.
 
-`specbackfill` owns deterministic companion-artifact checks: stable rule IDs,
-diff-local evidence, required finding fields, text output, JSON output, and
-exit behavior. Downstream tools, including `local-ai-review`, MAY consume
-`specbackfill` JSON, store it, summarize it, or compare it with model or human
-review findings. They SHOULD NOT reimplement the same deterministic companion
-rules while `specbackfill` remains the active rule-engine source of truth.
+`specbackfill` owns deterministic companion-obligation checks: stable rule IDs,
+diff-local evidence, companion status semantics, required finding fields, text
+output, JSON output, and exit behavior. Downstream tools, including
+`local-ai-review`, MAY consume `specbackfill` JSON, store it, summarize it, or
+compare it with model or human review findings. They SHOULD NOT reimplement the
+same deterministic companion rules while `specbackfill` remains the active
+rule-engine source of truth.
+
+`review-firewall` MAY consume `specbackfill` output as a review signal source,
+but it MUST NOT become the owner of diff-local companion obligation detection.
+`local-ai-review` owns probabilistic review, review history, and prompt
+calibration. `review-firewall` owns review-comment triage and routing.
 
 ## 4. Command-Line Interface
 
@@ -248,6 +277,10 @@ Repo profile signals MUST NOT be treated as primary proof.
 Primary evidence for a finding MUST still come from the diff.
 
 ## 7. Findings
+
+In v0, a finding is the user-facing unresolved form of a companion obligation.
+It does not mean the repository globally lacks a file, test, migration, or
+document.
 
 ### 7.1 Required fields
 
@@ -423,6 +456,9 @@ Recommended shape:
 ### 8.2 JSON output
 
 `json` output MUST be machine-usable and SHOULD have a stable top-level shape.
+The current v0 JSON contract is finding-oriented. A future full obligation
+artifact MUST be explicitly versioned and MUST NOT remove or silently reinterpret
+the required finding fields defined by this document.
 
 Recommended structure:
 
@@ -479,6 +515,16 @@ When `--explain` is enabled, JSON output MAY include an additive top-level `expl
 - `expected_companions`
 
 The `findings` array remains the deterministic machine contract. Explanations MUST preserve rule IDs, evidence references, and expected companion categories.
+
+If a later phase adds a full obligation artifact, it MUST preserve all of the
+following boundaries:
+
+- deterministic obligation IDs
+- deterministic rule IDs
+- diff-local anchor evidence
+- companion status values with no repository-wide absence claims
+- versioned schema or output mode
+- downstream-safe separation from AI findings and review-comment routing
 
 ### 8.3 Markdown output
 
@@ -821,7 +867,8 @@ A conforming v0 implementation of `specbackfill` MUST:
 11. support summary-only output without changing rule evaluation
 12. support fixture coverage visibility for repository maintainers
 13. include deterministic omission signatures for emitted findings
-14. remain phase-limited and conservative in scope
+14. treat findings as unresolved companion obligations without requiring an unversioned obligation artifact
+15. remain phase-limited and conservative in scope
 
 The quality bar for this product is not breadth.
 It is **precision, explicitness, and honesty about what the diff can actually support**.
