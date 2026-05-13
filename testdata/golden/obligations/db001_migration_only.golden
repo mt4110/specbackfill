@@ -1,0 +1,15 @@
+{
+  "schema_version": "obligations.v1",
+  "tool": {
+    "name": "specbackfill",
+    "version": "v0"
+  },
+  "run": {
+    "run_id": "run-b0fcb967d571ed23",
+    "input_kind": "diff_file",
+    "base": null,
+    "head": null,
+    "diff_fingerprint": "sha256:b0fcb967d571ed23fd6383199b68bb76424a5987f1ffbac5356fe35381545b64"
+  },
+  "obligations": []
+}

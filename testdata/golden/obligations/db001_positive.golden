@@ -1,0 +1,67 @@
+{
+  "schema_version": "obligations.v1",
+  "tool": {
+    "name": "specbackfill",
+    "version": "v0"
+  },
+  "run": {
+    "run_id": "run-f3251ce77e991c6c",
+    "input_kind": "diff_file",
+    "base": null,
+    "head": null,
+    "diff_fingerprint": "sha256:f3251ce77e991c6c47f711bcc27d1f949ae2920ff8a3eca2018fd0ef27896cf6"
+  },
+  "obligations": [
+    {
+      "obligation_id": "obl-v1-6af836ff87ff697c",
+      "finding_id": "v0-3e8fca4b2cdb678b",
+      "omission_signature": "db001.schema_changed.migration_companion",
+      "rule_id": "DB001",
+      "rule_version": "v0",
+      "status": "missing",
+      "severity": "error",
+      "confidence": "high",
+      "title": "Schema changed, but no matching migration companion moved with this diff",
+      "why": "Schema-affecting lines moved in the diff, but no matching migration companion evidence moved with them.",
+      "diff_local_claim": true,
+      "anchor": {
+        "kind": "schema_change",
+        "path": "schema.prisma",
+        "line": 3,
+        "evidence": [
+          {
+            "file": "schema.prisma",
+            "line": 3,
+            "kind": "added",
+            "excerpt": "email String @unique"
+          }
+        ]
+      },
+      "required_companions": [
+        {
+          "kind": "migration_companion",
+          "status": "missing",
+          "satisfiers": [],
+          "expected_paths": [
+            "migrations/**",
+            "db/migrations/**",
+            "prisma/migrations/**"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "file": "schema.prisma",
+          "line": 3,
+          "kind": "added",
+          "excerpt": "email String @unique"
+        }
+      ],
+      "suppression": null,
+      "downstream": {
+        "import_kind": "deterministic_static_layer",
+        "source_signal": "specbackfill"
+      }
+    }
+  ]
+}

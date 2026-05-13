@@ -25,6 +25,7 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 	var failOn string
 	var includeExplanations bool
 	var summaryOnly bool
+	var emitObligations bool
 
 	flags.StringVar(&base, "base", "", "base git ref")
 	flags.StringVar(&head, "head", "", "head git ref")
@@ -33,6 +34,7 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 	flags.StringVar(&failOn, "fail-on", "error", "threshold: error|warn|off")
 	flags.BoolVar(&includeExplanations, "explain", false, "include grounded explanations for emitted findings")
 	flags.BoolVar(&summaryOnly, "summary", false, "render summary-only output")
+	flags.BoolVar(&emitObligations, "emit-obligations", false, "emit versioned companion obligation artifact JSON")
 
 	if err := flags.Parse(args); err != nil {
 		if err == flag.ErrHelp {
@@ -44,7 +46,7 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 	if flags.NArg() != 0 {
 		return writeError(stderr, "unexpected positional arguments")
 	}
-	if err := validateFlags(base, head, diffFile, format, failOn); err != nil {
+	if err := validateFlags(base, head, diffFile, format, failOn, summaryOnly, includeExplanations, emitObligations, flagWasProvided(flags, "format")); err != nil {
 		return writeError(stderr, err.Error())
 	}
 
@@ -68,10 +70,24 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 		return writeError(stderr, fmt.Sprintf("detect repo profile: %v", err))
 	}
 
-	findings := rules.Evaluate(diff, repoProfile)
+	obligations := rules.EvaluateObligations(diff, repoProfile)
+	findings := rules.FindingsFromObligations(obligations)
 	result := report.Build(repoProfile, findings)
 	if includeExplanations && !summaryOnly {
 		result.Explanations = explain.Build(findings)
+	}
+
+	if emitObligations {
+		artifact := report.BuildObligationArtifact(report.ObligationArtifactOptions{
+			InputKind: inputKind(base, head, diffFile),
+			Base:      base,
+			Head:      head,
+			DiffInput: diffInput,
+		}, obligations)
+		if err := report.WriteObligationArtifact(stdout, artifact); err != nil {
+			return writeError(stderr, fmt.Sprintf("render obligation artifact: %v", err))
+		}
+		return report.ExitCode(result.Findings, failOn)
 	}
 
 	options := report.Options{
@@ -86,6 +102,26 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 	}
 
 	return report.ExitCode(result.Findings, failOn)
+}
+
+func inputKind(base, head, diffFile string) string {
+	if diffFile != "" {
+		return "diff_file"
+	}
+	if base != "" && head != "" {
+		return "range"
+	}
+	return "working_tree"
+}
+
+func flagWasProvided(flags *flag.FlagSet, name string) bool {
+	provided := false
+	flags.Visit(func(visited *flag.Flag) {
+		if visited.Name == name {
+			provided = true
+		}
+	})
+	return provided
 }
 
 func inputSummary(base, head, diffFile string) string {
@@ -109,7 +145,7 @@ func inputNotes(base, head, diffFile string) []string {
 	}
 }
 
-func validateFlags(base, head, diffFile, format, failOn string) error {
+func validateFlags(base, head, diffFile, format, failOn string, summaryOnly, includeExplanations, emitObligations, formatProvided bool) error {
 	switch format {
 	case "text", "json", "markdown":
 	default:
@@ -127,6 +163,15 @@ func validateFlags(base, head, diffFile, format, failOn string) error {
 	}
 	if (base == "") != (head == "") {
 		return fmt.Errorf("--base and --head must be provided together")
+	}
+	if emitObligations && summaryOnly {
+		return fmt.Errorf("--emit-obligations cannot be combined with --summary")
+	}
+	if emitObligations && includeExplanations {
+		return fmt.Errorf("--emit-obligations cannot be combined with --explain")
+	}
+	if emitObligations && formatProvided && format != "json" {
+		return fmt.Errorf("--emit-obligations can only be combined with --format json")
 	}
 
 	return nil

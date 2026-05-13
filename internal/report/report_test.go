@@ -307,6 +307,83 @@ func TestBuildAddsStableFindingID(t *testing.T) {
 	}
 }
 
+func TestBuildObligationArtifactAddsVersionedMetadataAndIDs(t *testing.T) {
+	t.Parallel()
+
+	baseObligation := model.Obligation{
+		RuleID:         "DB001",
+		RuleVersion:    "v0",
+		Status:         model.ObligationStatusMissing,
+		Severity:       model.SeverityError,
+		Confidence:     "high",
+		Title:          "Schema changed, but no matching migration companion moved with this diff",
+		Why:            "Schema-affecting lines moved in the diff, but no matching migration companion evidence moved with them.",
+		DiffLocalClaim: true,
+		Anchor: model.ObligationAnchor{
+			Kind: "schema_change",
+			Path: "schema.prisma",
+			Line: intPtr(3),
+			Evidence: []model.Evidence{{
+				File:    "schema.prisma",
+				Line:    3,
+				Kind:    string(model.LineKindAdded),
+				Excerpt: "email String @unique",
+			}},
+		},
+		RequiredCompanions: []model.RequiredCompanion{{
+			Kind:          "migration_companion",
+			Status:        model.ObligationStatusMissing,
+			Satisfiers:    []string{},
+			ExpectedPaths: []string{"prisma/migrations/**"},
+		}},
+		Evidence: []model.Evidence{{
+			File:    "schema.prisma",
+			Line:    3,
+			Kind:    string(model.LineKindAdded),
+			Excerpt: "email String @unique",
+		}},
+		Downstream: model.DownstreamMetadata{
+			ImportKind:   "deterministic_static_layer",
+			SourceSignal: "specbackfill",
+		},
+		ExpectedCompanions: []string{"migration file"},
+	}
+
+	missing := BuildObligationArtifact(ObligationArtifactOptions{
+		InputKind: "diff_file",
+		DiffInput: []byte("diff"),
+	}, []model.Obligation{baseObligation})
+
+	if missing.SchemaVersion != "obligations.v1" || missing.Tool.Name != "specbackfill" || missing.Run.InputKind != "diff_file" {
+		t.Fatalf("artifact metadata = %+v, want obligations.v1 specbackfill diff_file", missing)
+	}
+	if missing.Run.Base != nil || missing.Run.Head != nil {
+		t.Fatalf("run refs = base %v head %v, want nil refs", missing.Run.Base, missing.Run.Head)
+	}
+	if missing.Run.RunID == "" || !strings.HasPrefix(missing.Run.DiffFingerprint, "sha256:") {
+		t.Fatalf("run IDs missing: %+v", missing.Run)
+	}
+	if len(missing.Obligations) != 1 {
+		t.Fatalf("len(obligations) = %d, want 1", len(missing.Obligations))
+	}
+	missingObligation := missing.Obligations[0]
+	if missingObligation.ObligationID == "" || missingObligation.FindingID == nil || missingObligation.OmissionSignature == nil {
+		t.Fatalf("missing obligation IDs not populated: %+v", missingObligation)
+	}
+
+	satisfiedObligation := baseObligation
+	satisfiedObligation.Status = model.ObligationStatusSatisfied
+	satisfiedObligation.RequiredCompanions[0].Status = model.ObligationStatusSatisfied
+	satisfiedObligation.RequiredCompanions[0].Satisfiers = []string{"prisma/migrations/20260329010101_add_email/migration.sql"}
+	satisfied := BuildObligationArtifact(ObligationArtifactOptions{InputKind: "diff_file", DiffInput: []byte("diff")}, []model.Obligation{satisfiedObligation})
+	if satisfied.Obligations[0].ObligationID != missingObligation.ObligationID {
+		t.Fatalf("obligation ID changed across status: missing=%q satisfied=%q", missingObligation.ObligationID, satisfied.Obligations[0].ObligationID)
+	}
+	if satisfied.Obligations[0].FindingID != nil || satisfied.Obligations[0].OmissionSignature != nil {
+		t.Fatalf("satisfied obligation has finding metadata: %+v", satisfied.Obligations[0])
+	}
+}
+
 func TestBuildOverwritesGeneratedFindingMetadata(t *testing.T) {
 	t.Parallel()
 
@@ -330,6 +407,10 @@ func TestBuildOverwritesGeneratedFindingMetadata(t *testing.T) {
 	if got := result.Findings[0].OmissionSignature; got != "cfg001.config_introduced.docs_default" {
 		t.Fatalf("OmissionSignature = %q, want generated CFG001 signature", got)
 	}
+}
+
+func intPtr(value int) *int {
+	return &value
 }
 
 func TestBuildAddsOmissionSignatureForEveryCatalogRule(t *testing.T) {

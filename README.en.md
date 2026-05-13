@@ -34,7 +34,7 @@ This README is the English counterpart to the Japanese primary entry point. The 
 - Every finding requires **evidence**. If the evidence cannot be shown, the finding must not be emitted.
 - v0 must stand on diff input alone. It does not depend on PR titles, PR descriptions, or issue context.
 - It is advisory-first. Until pilot evidence justifies stricter operation, do not position it primarily as a blocking gate.
-- Full obligation/status JSON is a future versioned artifact. The current v0 public contract is `check` findings, rules, and fixtures.
+- Obligation/status JSON is available explicitly through the `--emit-obligations` versioned artifact. Normal `--format json` remains the findings contract.
 
 When paired with a local LLM review system such as `local-ai-review`, specbackfill should act as the deterministic static layer and emit companion obligation output. The AI layer may explain, organize, or store those findings, but specbackfill itself must not invent AI findings.
 
@@ -48,6 +48,7 @@ specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
                   [--fail-on error|warn|off]
                   [--summary]
                   [--explain]
+                  [--emit-obligations]
 ```
 
 To inspect the implemented rules:
@@ -68,8 +69,9 @@ specbackfill fixtures report
 - Exit codes: `0` no findings, `1` findings at threshold, `2` tool error
 - `--summary`: shows only severity counts and fired rules. It does not change finding evaluation.
 - `--explain`: adds grounded explanations tied to existing findings. It does not add findings.
+- `--emit-obligations`: emits an `obligations.v1` JSON artifact with `schema_version`, `tool`, `run`, and `obligations`. Omit `--format` or use `--format json`.
 - JSON findings include deterministic `finding_id` and `omission_signature` fields.
-- Current v0 JSON is the findings contract. Adding a full obligation/status artifact requires versioning and a public spec update.
+- Normal `--format json` is the findings contract. The obligation/status artifact is a separate contract described by [schemas/obligations.schema.json](./schemas/obligations.schema.json).
 - `rules`: shows implemented default v0 rule IDs, severities, intent, and expected companions. It does not evaluate a diff.
 - `fixtures`: shows synthetic fixture coverage by rule. It does not evaluate a diff.
 
