@@ -265,7 +265,13 @@
             }
           },
           "required_companions": {
-            "items": {
+            "contains": {
+              "type": "object",
+              "required": [
+                "status",
+                "satisfiers",
+                "satisfier_evidence"
+              ],
               "properties": {
                 "status": {
                   "const": "satisfied"

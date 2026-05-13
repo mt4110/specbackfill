@@ -604,6 +604,48 @@ func TestLocalAIReviewEvidenceDigestChangesWithCompanionEvidence(t *testing.T) {
 	}
 }
 
+func TestLocalAIReviewEvidenceDigestChangesWithStatusReasons(t *testing.T) {
+	t.Parallel()
+
+	obligation := model.Obligation{
+		RuleID:         "CFG001",
+		RuleVersion:    "v0",
+		Status:         model.ObligationStatusSuppressed,
+		Severity:       model.SeverityWarn,
+		Confidence:     "medium",
+		Title:          "CFG001 evidence matched a documented negative condition",
+		Why:            "suppressed",
+		DiffLocalClaim: true,
+		Anchor: model.ObligationAnchor{
+			Kind:     "suppressed_config_reference",
+			Path:     "docs/config.md",
+			Evidence: []model.Evidence{{File: "docs/config.md", Line: 1, Kind: string(model.LineKindAdded), Excerpt: `os.Getenv("NEW_TOKEN")`}},
+		},
+		RequiredCompanions: []model.RequiredCompanion{{
+			Kind:          "config_docs_default_companion",
+			Status:        model.ObligationStatusSuppressed,
+			ExpectedPaths: []string{"docs/**"},
+		}},
+		Evidence: []model.Evidence{{File: "docs/config.md", Line: 1, Kind: string(model.LineKindAdded), Excerpt: `os.Getenv("NEW_TOKEN")`}},
+		Suppression: &model.ObligationSuppression{
+			Reason:   model.SuppressionReasonDocsOnly,
+			Evidence: []model.Evidence{{File: "docs/config.md", Line: 1, Kind: string(model.LineKindAdded), Excerpt: `os.Getenv("NEW_TOKEN")`}},
+		},
+	}
+	docsItem := BuildLocalAIReviewImportItems(BuildObligationArtifact(ObligationArtifactOptions{InputKind: "diff_file", DiffInput: []byte("diff")}, []model.Obligation{obligation}))[0]
+
+	testsOnly := obligation
+	testsOnly.Suppression = &model.ObligationSuppression{
+		Reason:   model.SuppressionReasonTestsOnly,
+		Evidence: obligation.Suppression.Evidence,
+	}
+	testsItem := BuildLocalAIReviewImportItems(BuildObligationArtifact(ObligationArtifactOptions{InputKind: "diff_file", DiffInput: []byte("diff")}, []model.Obligation{testsOnly}))[0]
+
+	if docsItem.EvidenceDigest == testsItem.EvidenceDigest {
+		t.Fatalf("EvidenceDigest did not change when suppression reason changed: %q", docsItem.EvidenceDigest)
+	}
+}
+
 func TestLocalAIReviewImportSchemaDocumentsRequiredFields(t *testing.T) {
 	t.Parallel()
 

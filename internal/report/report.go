@@ -67,7 +67,10 @@ func BuildObligationArtifact(options ObligationArtifactOptions, obligations []mo
 }
 
 func BuildLocalAIReviewImportItems(artifact model.ObligationArtifact) []model.LocalAIReviewImportItem {
-	obligations := normalizeObligationsForImport(artifact.Obligations)
+	obligations := normalizeObligations(artifact.Obligations, obligationNormalizationOptions{
+		PreserveExistingIDs: true,
+		ExpectedCompanions:  importExpectedCompanions,
+	})
 	items := make([]model.LocalAIReviewImportItem, 0, len(obligations))
 
 	for _, obligation := range obligations {
@@ -104,7 +107,12 @@ func BuildLocalAIReviewImportItems(artifact model.ObligationArtifact) []model.Lo
 	return items
 }
 
-func normalizeObligationsForImport(obligations []model.Obligation) []model.Obligation {
+type obligationNormalizationOptions struct {
+	PreserveExistingIDs bool
+	ExpectedCompanions  func(model.Obligation) []string
+}
+
+func normalizeObligations(obligations []model.Obligation, options obligationNormalizationOptions) []model.Obligation {
 	if obligations == nil {
 		return []model.Obligation{}
 	}
@@ -114,7 +122,7 @@ func normalizeObligationsForImport(obligations []model.Obligation) []model.Oblig
 	for index := range normalized {
 		obligation := &normalized[index]
 		normalizeObligationArtifactSlices(obligation)
-		if obligation.ObligationID == "" {
+		if !options.PreserveExistingIDs || obligation.ObligationID == "" {
 			obligation.ObligationID = stableObligationID(*obligation)
 		}
 		if obligation.Status == model.ObligationStatusSatisfied && obligation.StatusReason == nil {
@@ -137,7 +145,7 @@ func normalizeObligationsForImport(obligations []model.Obligation) []model.Oblig
 			obligation.OmissionSignature = nil
 			continue
 		}
-		if obligation.FindingID == nil {
+		if !options.PreserveExistingIDs || obligation.FindingID == nil {
 			findingID := stableFindingID(model.Finding{
 				RuleID:             obligation.RuleID,
 				Severity:           obligation.Severity,
@@ -145,17 +153,24 @@ func normalizeObligationsForImport(obligations []model.Obligation) []model.Oblig
 				Title:              obligation.Title,
 				Why:                obligation.Why,
 				Evidence:           obligation.Evidence,
-				ExpectedCompanions: importExpectedCompanions(*obligation),
+				ExpectedCompanions: normalizedExpectedCompanions(*obligation, options.ExpectedCompanions),
 			})
 			obligation.FindingID = &findingID
 		}
-		if obligation.OmissionSignature == nil {
+		if !options.PreserveExistingIDs || obligation.OmissionSignature == nil {
 			signature := omissionSignature(obligation.RuleID)
 			obligation.OmissionSignature = &signature
 		}
 	}
 
 	return normalized
+}
+
+func normalizedExpectedCompanions(obligation model.Obligation, fallback func(model.Obligation) []string) []string {
+	if fallback == nil {
+		return obligation.ExpectedCompanions
+	}
+	return fallback(obligation)
 }
 
 func importExpectedCompanions(obligation model.Obligation) []string {
@@ -184,47 +199,7 @@ func withFindingIDs(findings []model.Finding) []model.Finding {
 }
 
 func withObligationIDs(obligations []model.Obligation) []model.Obligation {
-	withIDs := make([]model.Obligation, len(obligations))
-	copy(withIDs, obligations)
-	for index := range withIDs {
-		withIDs[index].ObligationID = stableObligationID(withIDs[index])
-		normalizeObligationArtifactSlices(&withIDs[index])
-		if withIDs[index].Status == model.ObligationStatusSatisfied && withIDs[index].StatusReason == nil {
-			satisfierEvidence := firstSatisfierEvidence(withIDs[index].RequiredCompanions)
-			if len(satisfierEvidence) > 0 {
-				withIDs[index].StatusReason = &model.ObligationStatusReason{
-					Reason:   model.StatusReasonCompanionPresent,
-					Evidence: satisfierEvidence,
-				}
-			}
-		}
-		if withIDs[index].Status == model.ObligationStatusSuppressed && withIDs[index].StatusReason == nil && withIDs[index].Suppression != nil {
-			withIDs[index].StatusReason = &model.ObligationStatusReason{
-				Reason:   model.StatusReason(withIDs[index].Suppression.Reason),
-				Evidence: withIDs[index].Suppression.Evidence,
-			}
-		}
-		if withIDs[index].Status != model.ObligationStatusMissing {
-			withIDs[index].FindingID = nil
-			withIDs[index].OmissionSignature = nil
-			continue
-		}
-
-		finding := model.Finding{
-			RuleID:             withIDs[index].RuleID,
-			Severity:           withIDs[index].Severity,
-			Confidence:         withIDs[index].Confidence,
-			Title:              withIDs[index].Title,
-			Why:                withIDs[index].Why,
-			Evidence:           withIDs[index].Evidence,
-			ExpectedCompanions: withIDs[index].ExpectedCompanions,
-		}
-		findingID := stableFindingID(finding)
-		signature := omissionSignature(withIDs[index].RuleID)
-		withIDs[index].FindingID = &findingID
-		withIDs[index].OmissionSignature = &signature
-	}
-	return withIDs
+	return normalizeObligations(obligations, obligationNormalizationOptions{})
 }
 
 func normalizeObligationArtifactSlices(obligation *model.Obligation) {
@@ -360,11 +335,13 @@ func stableEvidenceDigest(obligation model.Obligation) string {
 	if obligation.StatusReason == nil {
 		writeFingerprintField(hash, "status_reason", "")
 	} else {
+		writeFingerprintField(hash, "status_reason.reason", string(obligation.StatusReason.Reason))
 		writeEvidenceFingerprint(hash, "status_reason.evidence", obligation.StatusReason.Evidence)
 	}
 	if obligation.Suppression == nil {
 		writeFingerprintField(hash, "suppression", "")
 	} else {
+		writeFingerprintField(hash, "suppression.reason", string(obligation.Suppression.Reason))
 		writeEvidenceFingerprint(hash, "suppression.evidence", obligation.Suppression.Evidence)
 	}
 
