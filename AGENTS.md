@@ -4,13 +4,13 @@ Read this file and [`docs/v0-spec.md`](./docs/v0-spec.md) before making changes.
 
 ## 1. Mission
 
-`specbackfill` is a phase-limited CLI for inferring **diff-local omissions** from code diffs.
+`specbackfill` is a phase-limited CLI and deterministic change-contract compiler for inferring **diff-local companion obligations** from code diffs.
 
 It does **not** review overall code quality.
 It does **not** claim repository-wide absence.
 It asks a narrower question:
 
-> For this diff, what companion artifacts should have moved with it, and which of them did not move in the same diff?
+> For this diff, what companion obligations did the changed anchors create, which companion artifacts moved with them, and which unresolved obligations remain visible from the same diff?
 
 ## 2. Canonical names
 
@@ -19,8 +19,11 @@ Use these names consistently:
 - Repository name: `specbackfill`
 - Binary / CLI name: `specbackfill`
 - Primary command: `specbackfill check`
-- Core concept: **companion artifacts**
-- Finding semantics: **diff-local omission**
+- Product identity: **deterministic change-contract compiler**
+- Secondary identity: **companion obligation compiler**
+- Core concept: **companion obligations**
+- Related artifacts: **companion artifacts**
+- Finding semantics: **diff-local omission** for unresolved companion obligations
 - Detection core: **rule-based**
 - Normative spec: `docs/v0-spec.md`
 
@@ -30,22 +33,53 @@ Do not introduce alternate product names in code, docs, examples, or tests unles
 
 `specbackfill` is not a general AI code reviewer.
 
-It is a small deterministic pre-review gate for structural omissions that should be visible from the diff alone. Its value is not breadth or intelligence. Its value is quiet, needle-threading precision:
+It is a small deterministic compiler for structural change contracts that should be visible from the diff alone. Its value is not breadth or intelligence. Its value is quiet, needle-threading precision:
 
 - concrete evidence
+- extracted companion obligations
+- companion status boundaries
 - reproducible rule output
 - stable text and JSON reports
 - conservative wording that does not overclaim
 
-Think of it as a small blocker before human or AI review: if a diff changes a schema, API contract, config surface, public error/status contract, or generated spec/client artifact, `specbackfill` checks whether the expected companion artifacts moved in the same diff. It catches the loose threads between implementation changes and their companion artifacts.
+Think of it as a compiler from `git diff` to companion obligations: if a diff changes a schema, API contract, config surface, public error/status contract, or generated spec/client artifact, `specbackfill` identifies the companion obligation created by that anchor and reports the unresolved obligation when the expected companion artifacts did not move in the same diff.
 
-This pairs cleanly with `local-ai-review`: `specbackfill` should emit evidence-backed, rule-based diff-local omissions first; `local-ai-review` can then perform broader local LLM review on the PR diff. Do not merge these roles. `specbackfill` should provide deterministic structure before AI interpretation, not become another generic AI reviewer.
+This pairs cleanly with `local-ai-review`: `specbackfill` should emit evidence-backed, rule-based companion obligation output first; `local-ai-review` can then perform broader local LLM review on the PR diff. Do not merge these roles. `specbackfill` should provide deterministic structure before AI interpretation, not become another generic AI reviewer.
 
-`specbackfill` and `local-ai-review` are different products. `specbackfill` owns the deterministic companion-artifact rule engine: stable rule IDs, diff-local evidence, fixture coverage, text output, JSON output, and CLI exit behavior. `local-ai-review` may consume that output as an adapter or downstream review layer, but it must not become the place where `DB001`, `API001`, `CFG001`, or other deterministic companion rules are reimplemented.
+`specbackfill` and `local-ai-review` are different products. `specbackfill` owns the deterministic companion-obligation rule engine: stable rule IDs, diff-local evidence, fixture coverage, text output, JSON output, and CLI exit behavior. `local-ai-review` may consume that output as an adapter or downstream review layer, but it must not become the place where `DB001`, `API001`, `CFG001`, or other deterministic companion rules are reimplemented.
 
 If a proposed change makes the tool sound smarter than it is, depends on non-deterministic detection, claims repository-wide absence, or turns the project into a broad code review assistant, stop and keep the scope narrow.
 
-## 4. Non-negotiables
+## 4. Strategy lock
+
+The public product identity is locked as:
+
+> `specbackfill` is a deterministic change-contract compiler that extracts diff-local companion obligations from code diffs and reports unresolved obligations with concrete evidence from the same diff.
+
+Do not describe the product only as a deterministic companion gate. That phrase is allowed only as a subordinate implementation property. The product story must stay obligation/compiler-first.
+
+If `.private_docs/specbackfill_strategy_lock_pack/.agent/` exists, read the strategy lock files there before behavior, rule, fixture, CLI, output, or documentation changes:
+
+1. `00_READ_FIRST.md`
+2. `01_STRATEGY_LOCK.md`
+3. `02_BOUNDARY_MATRIX.md`
+4. `03_STOP_AND_CONTINUE_THRESHOLDS.md`
+5. `04_ADVERSARIAL_LOOP.md`
+6. `05_IMPLEMENTATION_GATE.md`
+
+Hard stop if a change:
+
+- makes AI/LLM the detection core
+- claims repository-wide absence
+- adds PR comment posting to `specbackfill`
+- reimplements `local-ai-review` learning/history/prompt calibration
+- reimplements `review-firewall` review-comment triage/routing
+- changes JSON output semantics without versioning
+- adds rules without positive, negative, and companion-present fixture strategy
+
+Until real-diff pilot thresholds justify stricter operation, keep `specbackfill` advisory-first and artifact-first.
+
+## 5. Non-negotiables
 
 - Detection must remain rule-based.
 - Findings must remain diff-local.
@@ -54,7 +88,7 @@ If a proposed change makes the tool sound smarter than it is, depends on non-det
 - Rule evaluation must stand on diff input alone.
 - Do not make v0 depend on PR metadata, issue trackers, network calls, or external services.
 
-## 5. First PR readiness bar
+## 6. First PR readiness bar
 
 The first PR that claims working behavior should be a verified v0 MVP, not a complete future product.
 
@@ -79,13 +113,13 @@ For the current v0 MVP line, the implemented-rule bar is:
 - `OPS001`
 - `DOC001`
 
-## 6. Phase discipline
+## 7. Phase discipline
 
 Implement only the requested phase.
 
 Allowed default phases:
 
-- Phase 0: docs scaffold
+- Phase 0: docs scaffold / strategy lock
 - Phase 1: `check` command skeleton
 - Phase 2: default v0 rules
 - Phase 3: fixture hardening / false-positive control
@@ -97,7 +131,7 @@ Keep changes small.
 Do not widen scope on your own.
 Do not add future-facing abstractions unless the current phase requires them.
 
-## 7. CLI contract
+## 8. CLI contract
 
 Unless a task explicitly changes it, preserve this contract:
 
@@ -116,7 +150,7 @@ Exit codes:
 
 Do not silently change flags, defaults, exit codes, or output semantics.
 
-## 8. Documentation policy
+## 9. Documentation policy
 
 - `README.md` must remain the Japanese primary entry point.
 - `README.en.md` must remain the English counterpart.
@@ -128,7 +162,7 @@ Do not silently change flags, defaults, exit codes, or output semantics.
 - Do not create a docs forest unless explicitly requested.
 - Do not claim features that are not implemented.
 
-## 9. Rule authoring discipline
+## 10. Rule authoring discipline
 
 When adding or changing a rule:
 
@@ -142,7 +176,7 @@ When adding or changing a rule:
 Prefer multiple signals such as path match, hunk keyword match, and companion absence within touched files.
 Do not emit broad findings from path names alone unless the phase explicitly allows it.
 
-## 10. Rule promotion gate
+## 11. Rule promotion gate
 
 A rule, suppression, companion-recognition change, or default severity change can be promoted only if it satisfies all of the following:
 
@@ -165,7 +199,7 @@ Before merging a rule change, reviewers should ask:
 - Does JSON output remain stable or change only for an intentional contract update?
 - Does text output remain conservative and understandable?
 
-## 11. Change discipline
+## 12. Change discipline
 
 - Prefer the simplest implementation that satisfies the current task.
 - Preserve existing behavior unless the task explicitly changes it.
@@ -175,7 +209,7 @@ Before merging a rule change, reviewers should ask:
 The fastest way to damage this product is to make it sound smarter than it is.
 Be narrow, explicit, and evidence-first.
 
-## 12. `.private_docs` local design contract
+## 13. `.private_docs` local design contract
 
 If `.private_docs/` exists, treat it as local design context. It is intentionally ignored and should not be mixed into the public PR surface.
 

@@ -1,8 +1,10 @@
 <p align="right"><a href="./README.md">日本語</a></p>
 
-# specbackfill / 実装差分の追従漏れを点検する CLI (diff-local omission CLI)
+# specbackfill / deterministic change-contract compiler for companion obligations
 
-specbackfill is a rule-based CLI that treats missing **companion artifacts** in a code diff as a **diff-local omission**. It does not claim repository-wide absence; it asks whether the things that should have moved with this diff actually moved in the same diff.
+specbackfill is a rule-based **deterministic change-contract compiler** for git diffs. It extracts the **companion obligations** created by a change. The current v0 `check` command reports obligations that lack companion evidence in the same diff as **diff-local omission** findings.
+
+It does not claim repository-wide absence. It asks which obligations this diff created, and whether the companion artifacts that satisfy them moved in the same diff.
 
 It catches the boring review comments teams keep repeating, using only the diff:
 
@@ -27,14 +29,16 @@ This README is the English counterpart to the Japanese primary entry point. The 
 ## Product Boundary
 
 - The detection core is **rule-based**. AI may explain findings later, but must not invent them.
+- The central concept is a **companion obligation**. A finding is a user-facing unresolved obligation.
 - Findings are strictly **diff-local**. The tool must not claim repository-wide absence.
 - Every finding requires **evidence**. If the evidence cannot be shown, the finding must not be emitted.
 - v0 must stand on diff input alone. It does not depend on PR titles, PR descriptions, or issue context.
-- It is a deterministic pre-review gate for catching small structural loose threads before AI or human review.
+- It is advisory-first. Until pilot evidence justifies stricter operation, do not position it primarily as a blocking gate.
+- Full obligation/status JSON is a future versioned artifact. The current v0 public contract is `check` findings, rules, and fixtures.
 
-When paired with a local LLM review system such as `local-ai-review`, specbackfill should run first and emit rule-based omission findings. The AI layer may explain or organize those findings, but specbackfill itself must not invent AI findings.
+When paired with a local LLM review system such as `local-ai-review`, specbackfill should act as the deterministic static layer and emit companion obligation output. The AI layer may explain, organize, or store those findings, but specbackfill itself must not invent AI findings.
 
-specbackfill is not `local-ai-review`. specbackfill remains the source of truth for deterministic rule IDs, evidence, fixtures, and CLI JSON; `local-ai-review` is a downstream consumer when it chooses to ingest that output.
+specbackfill is not `local-ai-review` or `review-firewall`. specbackfill remains the source of truth for deterministic rule IDs, obligation semantics, evidence, fixtures, and CLI JSON. `local-ai-review` owns probabilistic review, history, and prompt calibration; `review-firewall` owns review-comment triage and routing.
 
 ## v0 Contract
 
@@ -65,6 +69,7 @@ specbackfill fixtures report
 - `--summary`: shows only severity counts and fired rules. It does not change finding evaluation.
 - `--explain`: adds grounded explanations tied to existing findings. It does not add findings.
 - JSON findings include deterministic `finding_id` and `omission_signature` fields.
+- Current v0 JSON is the findings contract. Adding a full obligation/status artifact requires versioning and a public spec update.
 - `rules`: shows implemented default v0 rule IDs, severities, intent, and expected companions. It does not evaluate a diff.
 - `fixtures`: shows synthetic fixture coverage by rule. It does not evaluate a diff.
 
@@ -209,9 +214,9 @@ specbackfill is not a general static analyzer, PR comment bot, or team-policy sc
 - Semgrep finds code patterns and security/style issues.
 - Danger automates team-specific PR chores.
 - reviewdog reports linter findings on diffs.
-- specbackfill checks whether implementation changes moved with expected companion artifacts in the same diff.
+- specbackfill checks whether implementation changes created companion obligations and whether the expected companion artifacts moved in the same diff.
 
-The core finding is not "this code is wrong". The core finding is "this diff changed X, but no companion Y moved with this diff."
+The core finding is not "this code is wrong". The core finding is "this diff created obligation X, but no companion Y moved with this diff."
 
 ## License
 

@@ -1,8 +1,10 @@
 <p align="right"><a href="./README.en.md">English</a></p>
 
-# specbackfill / 実装差分の追従漏れを点検する CLI (diff-local omission CLI)
+# specbackfill / diff から companion obligation を抽出する deterministic change-contract compiler
 
-specbackfill は、コード差分から **companion artifacts** の追従漏れを **diff-local omission** として扱う、rule-based な CLI です。見るのは repo 全体の不足ではなく、**この diff で一緒に動くべきものが同じ diff で動いているか** です。
+specbackfill は、git diff から「この変更が発生させた **companion obligation**」を rule-based に抽出する **deterministic change-contract compiler** です。現行 v0 の `check` は、その obligation のうち同じ diff で companion evidence が見えないものを **diff-local omission** finding として報告します。
+
+見るのは repo 全体の不足ではありません。**この diff が作った obligation と、それを満たす companion artifact が同じ diff で動いているか** です。
 
 レビューで毎回出がちな、こういう追従漏れを diff だけから点検します。
 
@@ -27,14 +29,16 @@ specbackfill は、コード差分から **companion artifacts** の追従漏れ
 ## プロダクト境界
 
 - 判定核は **rule-based** です。AI は後段で説明を整えても、finding 自体は発明しません。
+- 中心概念は **companion obligation** です。finding は user-facing な未回収 obligation として扱います。
 - finding は常に **diff-local** です。repo 全体の欠落や不存在は主張しません。
 - すべての finding に **evidence** が必要です。証拠を示せない finding は出しません。
 - v0 は diff 入力だけで成立します。PR タイトルや issue 文脈には依存しません。
-- AI レビューの前段で、小さな構造的ほつれを決定論的にすくうための CLI です。
+- advisory-first です。pilot で有用性が確認されるまでは、blocking gate としての説明を前面に出しません。
+- full obligation/status JSON は将来の versioned artifact として扱います。現行 v0 の public contract は `check` findings、rules、fixtures です。
 
-`local-ai-review` のようなローカル LLM レビュー基盤と併用する場合、specbackfill は先に rule-based な omission finding を出し、AI 側はそれを説明・整理する役割に留めます。specbackfill 自体は AI finding を発明しません。
+`local-ai-review` のようなローカル LLM レビュー基盤と併用する場合、specbackfill は deterministic static layer として companion obligation output を出し、AI 側はそれを説明・整理・履歴化する役割に留めます。specbackfill 自体は AI finding を発明しません。
 
-specbackfill は `local-ai-review` とは別物です。deterministic な rule ID、evidence、fixture、CLI JSON の正本は specbackfill 側に置き、`local-ai-review` は必要ならその出力を取り込む downstream consumer として扱います。
+specbackfill は `local-ai-review` や `review-firewall` とは別物です。deterministic な rule ID、obligation semantics、evidence、fixture、CLI JSON の正本は specbackfill 側に置きます。`local-ai-review` は probabilistic review、history、prompt calibration を所有し、`review-firewall` は既存 review comment の triage/routing を所有します。
 
 ## v0 の契約
 
@@ -65,6 +69,7 @@ specbackfill fixtures report
 - `--summary`: severity counts と fired rules だけを表示します。finding 判定は変えません。
 - `--explain`: 既存 finding に紐づく grounded explanation を追加します。finding 自体は増やしません。
 - JSON findings には deterministic な `finding_id` と `omission_signature` が入ります。
+- 現行 v0 の JSON は findings 契約です。full obligation/status artifact を追加する場合は versioning と public spec 更新を必要とします。
 - `rules`: 実装済み default v0 rule の ID、severity、意図、expected companions を表示します。diff は評価しません。
 - `fixtures`: synthetic fixture coverage を rule ごとに表示します。diff は評価しません。
 
@@ -162,7 +167,7 @@ make fixtures
 
 - `make check` または `make pr BASE=main HEAD=HEAD` が tool error なく終わる
 - finding が出た場合、rule ID、evidence、expected companions を見て判断できる
-- 文言が repo-wide absence ではなく「この diff で companion が動いていない」に留まっている
+- 文言が repo-wide absence ではなく「この diff で obligation を満たす companion が動いていない」に留まっている
 - うるさい・分かりにくい・外している finding は、次の synthetic fixture 候補として残す
 - 品質改善に入る前に `make trial` または `make test` と `make fixtures` で現在地を確認する
 
@@ -209,9 +214,9 @@ specbackfill は general static analyzer、PR comment bot、team-policy script �
 - Semgrep は code pattern や security/style issue を見つけます。
 - Danger は team-specific な PR 雑務を自動化します。
 - reviewdog は linter finding を diff 上に報告します。
-- specbackfill は implementation change と expected companion artifacts が同じ diff で動いたかを点検します。
+- specbackfill は implementation change が作った companion obligation と、それを満たす expected companion artifacts が同じ diff で動いたかを点検します。
 
-中心の finding は「このコードが間違っている」ではなく、「この diff は X を変えたが、companion Y が同じ diff で動いていない」です。
+中心の finding は「このコードが間違っている」ではなく、「この diff は X という obligation を作ったが、companion Y が同じ diff で動いていない」です。
 
 ## ライセンス
 
