@@ -190,6 +190,96 @@ func TestRunEmitObligationsJSON(t *testing.T) {
 	}
 }
 
+func TestRunEmitLocalAIReviewImportJSONL(t *testing.T) {
+	t.Parallel()
+
+	fixture := writeFixtureCopy(t, "db001_positive.diff")
+	stdout, stderr, code := runCheckText(t, t.TempDir(), []string{"--diff-file", fixture, "--emit-local-ai-review-import", "--fail-on", "off"})
+	if code != 0 {
+		t.Fatalf("Run() code = %d, want 0; stderr=%q", code, stderr)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	lines := nonEmptyLines(stdout)
+	if len(lines) != 1 {
+		t.Fatalf("JSONL lines = %d, want 1\n%s", len(lines), stdout)
+	}
+
+	var item model.LocalAIReviewImportItem
+	if err := json.Unmarshal([]byte(lines[0]), &item); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v\nline=%s", err, lines[0])
+	}
+	if item.SchemaVersion != "local_ai_review_import.v1" || item.Source != "specbackfill" || item.ImportKind != "deterministic_static_layer" {
+		t.Fatalf("import metadata = %+v, want local_ai_review_import.v1 specbackfill deterministic_static_layer", item)
+	}
+	if item.RuleID != "DB001" || item.Status != model.ObligationStatusMissing || item.Severity != model.SeverityError {
+		t.Fatalf("item = %+v, want DB001 missing error", item)
+	}
+	if item.ItemID == "" || item.RunID == "" || item.FindingID == nil || item.OmissionSignature == nil {
+		t.Fatalf("item missing deterministic IDs: %+v", item)
+	}
+	if item.EvidenceDigest == "" || !strings.HasPrefix(item.EvidenceDigest, "sha256:") {
+		t.Fatalf("EvidenceDigest = %q, want sha256 digest", item.EvidenceDigest)
+	}
+	if !item.DiffLocalClaim || len(item.Evidence) == 0 || len(item.RequiredCompanions) == 0 {
+		t.Fatalf("item lost importable evidence/status details: %+v", item)
+	}
+}
+
+func TestRunEmitLocalAIReviewImportCannotCombineWithOtherOutputModes(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "summary",
+			args: []string{"--emit-local-ai-review-import", "--summary"},
+			want: "--emit-local-ai-review-import cannot be combined with --summary",
+		},
+		{
+			name: "explain",
+			args: []string{"--emit-local-ai-review-import", "--explain"},
+			want: "--emit-local-ai-review-import cannot be combined with --explain",
+		},
+		{
+			name: "format",
+			args: []string{"--emit-local-ai-review-import", "--format", "json"},
+			want: "--emit-local-ai-review-import cannot be combined with --format",
+		},
+		{
+			name: "obligations",
+			args: []string{"--emit-local-ai-review-import", "--emit-obligations"},
+			want: "--emit-obligations cannot be combined with --emit-local-ai-review-import",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+
+			code := Run(context.Background(), t.TempDir(), tc.args, &stdout, &stderr)
+			if code != 2 {
+				t.Fatalf("Run() code = %d, want 2", code)
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("stdout = %q, want empty", stdout.String())
+			}
+			if !strings.Contains(stderr.String(), tc.want) {
+				t.Fatalf("stderr = %q, want %q", stderr.String(), tc.want)
+			}
+		})
+	}
+}
+
 func TestRunEmitObligationsCannotCombineWithSummary(t *testing.T) {
 	t.Parallel()
 
@@ -475,4 +565,16 @@ func runCheckObligations(t *testing.T, cwd string, args []string) (model.Obligat
 		t.Fatalf("json.Unmarshal() error = %v\nraw=%s", err, stdout)
 	}
 	return artifact, code, stderr
+}
+
+func nonEmptyLines(text string) []string {
+	lines := strings.Split(text, "\n")
+	kept := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return kept
 }

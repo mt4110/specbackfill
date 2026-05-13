@@ -126,6 +126,7 @@ specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
                   [--summary]
                   [--explain]
                   [--emit-obligations]
+                  [--emit-local-ai-review-import]
 ```
 
 ### 4.2 Rule discovery commands
@@ -202,6 +203,14 @@ but MUST NOT be combined with `--format text`, `--format markdown`, `--summary`,
 or `--explain`.
 The obligation artifact MAY include satisfied and suppressed obligations so
 callers can inspect why anchor or candidate evidence did not become a finding.
+
+`--emit-local-ai-review-import` MUST render newline-delimited
+`local_ai_review_import.v1` JSON items derived from the same deterministic
+obligation artifact. It is an explicit downstream adapter mode, not the normal
+findings JSON contract and not a replacement for `obligations.v1`.
+It MUST NOT change rule evaluation or exit-code threshold behavior.
+It MUST NOT be combined with `--format`, `--summary`, `--explain`, or
+`--emit-obligations`.
 
 ### 4.6 Severity threshold
 
@@ -586,6 +595,54 @@ The artifact MUST preserve all of the following boundaries:
 - companion status values with no repository-wide absence claims
 - versioned schema and explicit output mode
 - downstream-safe separation from AI findings and review-comment routing
+
+### 8.2.2 local-ai-review import JSONL
+
+When `--emit-local-ai-review-import` is enabled, `specbackfill check` MUST emit
+one newline-delimited JSON object per obligation using schema
+`local_ai_review_import.v1`. The schema is
+`schemas/local_ai_review_import.schema.json`.
+
+This adapter format is intentionally smaller than the obligation artifact, but
+each item MUST preserve enough deterministic metadata for downstream review
+history to score it separately from AI-authored findings:
+
+- `schema_version`
+- `source`
+- `import_kind`
+- `source_signal`
+- `tool_version`
+- `run_id`
+- `input_kind`
+- `diff_fingerprint`
+- `item_id`
+- `obligation_id`
+- `finding_id`
+- `omission_signature`
+- `rule_id`
+- `rule_version`
+- `status`
+- `severity`
+- `confidence`
+- `title`
+- `why`
+- `diff_local_claim`
+- `evidence_digest`
+- `anchor`
+- `required_companions`
+- `evidence`
+- `suppression`
+
+`source` and `source_signal` MUST be `specbackfill`. `import_kind` MUST be
+`deterministic_static_layer`. `item_id` SHOULD be the deterministic
+`obligation_id`. `evidence_digest` MUST be a deterministic SHA-256 digest over
+the imported evidence and companion/suppression evidence for that item.
+
+This format MUST preserve all obligation status values, including `satisfied`
+and `suppressed`, so downstream tools can display deterministic obligations as
+a separate layer from AI findings. It MUST NOT add review history storage,
+prompt calibration, AI-generated findings, or PR comment posting to
+`specbackfill`.
 
 ### 8.3 Markdown output
 

@@ -119,6 +119,37 @@ func TestGoldenObligationOutputs(t *testing.T) {
 	}
 }
 
+func TestGoldenLocalAIReviewImportOutputs(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		fixture string
+	}{
+		{name: "db001_positive", fixture: "db001_positive.diff"},
+		{name: "db001_companion", fixture: "db001_companion.diff"},
+		{name: "db001_migration_only", fixture: "db001_migration_only.diff"},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			fixture := writeFixtureCopy(t, tc.fixture)
+			stdout, code, stderr := runCheckOutput(t, t.TempDir(), []string{"--diff-file", fixture, "--emit-local-ai-review-import", "--fail-on", "off"})
+			if code != 0 {
+				t.Fatalf("Run() code = %d, want 0; stderr=%q", code, stderr)
+			}
+			if stderr != "" {
+				t.Fatalf("stderr = %q, want empty", stderr)
+			}
+
+			assertGolden(t, "local_ai_review_import", tc.name, stdout)
+		})
+	}
+}
+
 func TestCrossSourceOutputEquivalence(t *testing.T) {
 	t.Parallel()
 

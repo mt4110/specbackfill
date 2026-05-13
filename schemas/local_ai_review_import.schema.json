@@ -1,0 +1,395 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mt4110/specbackfill/blob/main/schemas/local_ai_review_import.schema.json",
+  "title": "specbackfill local-ai-review import JSONL item",
+  "description": "Schema for each newline-delimited local_ai_review_import.v1 item emitted by specbackfill check --emit-local-ai-review-import.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "source",
+    "import_kind",
+    "source_signal",
+    "tool_version",
+    "run_id",
+    "input_kind",
+    "diff_fingerprint",
+    "item_id",
+    "obligation_id",
+    "finding_id",
+    "omission_signature",
+    "rule_id",
+    "rule_version",
+    "status",
+    "severity",
+    "confidence",
+    "title",
+    "why",
+    "diff_local_claim",
+    "evidence_digest",
+    "anchor",
+    "required_companions",
+    "evidence",
+    "suppression"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "local_ai_review_import.v1"
+    },
+    "source": {
+      "const": "specbackfill"
+    },
+    "import_kind": {
+      "const": "deterministic_static_layer"
+    },
+    "source_signal": {
+      "const": "specbackfill"
+    },
+    "tool_version": {
+      "type": "string"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "input_kind": {
+      "type": "string",
+      "enum": [
+        "working_tree",
+        "range",
+        "diff_file"
+      ]
+    },
+    "diff_fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "item_id": {
+      "type": "string"
+    },
+    "obligation_id": {
+      "type": "string"
+    },
+    "finding_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "omission_signature": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rule_id": {
+      "type": "string"
+    },
+    "rule_version": {
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/status"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "error",
+        "warn",
+        "info"
+      ]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "why": {
+      "type": "string"
+    },
+    "diff_local_claim": {
+      "const": true
+    },
+    "evidence_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "anchor": {
+      "type": "object",
+      "required": [
+        "kind",
+        "path",
+        "line",
+        "evidence"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "line": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "required_companions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "kind",
+          "status",
+          "satisfiers",
+          "satisfier_evidence",
+          "expected_paths"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/$defs/status"
+          },
+          "satisfiers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "satisfier_evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/evidence"
+            }
+          },
+          "expected_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidence"
+      }
+    },
+    "status_reason": {
+      "type": "object",
+      "required": [
+        "reason",
+        "evidence"
+      ],
+      "properties": {
+        "reason": {
+          "$ref": "#/$defs/status_reason"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "suppression": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "reason",
+        "evidence"
+      ],
+      "properties": {
+        "reason": {
+          "$ref": "#/$defs/suppression_reason"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "satisfied"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "status_reason"
+        ],
+        "properties": {
+          "status_reason": {
+            "properties": {
+              "reason": {
+                "const": "companion_present"
+              },
+              "evidence": {
+                "minItems": 1
+              }
+            }
+          },
+          "required_companions": {
+            "contains": {
+              "type": "object",
+              "required": [
+                "status",
+                "satisfiers",
+                "satisfier_evidence"
+              ],
+              "properties": {
+                "status": {
+                  "const": "satisfied"
+                },
+                "satisfiers": {
+                  "minItems": 1
+                },
+                "satisfier_evidence": {
+                  "minItems": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "suppressed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "status_reason"
+        ],
+        "properties": {
+          "status_reason": {
+            "properties": {
+              "reason": {
+                "$ref": "#/$defs/suppression_reason"
+              },
+              "evidence": {
+                "minItems": 1
+              }
+            }
+          },
+          "suppression": {
+            "type": "object",
+            "properties": {
+              "evidence": {
+                "minItems": 1
+              }
+            }
+          },
+          "required_companions": {
+            "items": {
+              "properties": {
+                "status": {
+                  "const": "suppressed"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "satisfied",
+        "missing",
+        "unknown",
+        "suppressed"
+      ]
+    },
+    "suppression_reason": {
+      "type": "string",
+      "enum": [
+        "docs_only",
+        "tests_only",
+        "example_only",
+        "sample_only",
+        "generated_only",
+        "migration_only"
+      ]
+    },
+    "status_reason": {
+      "type": "string",
+      "enum": [
+        "companion_present",
+        "docs_only",
+        "tests_only",
+        "example_only",
+        "sample_only",
+        "generated_only",
+        "migration_only"
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "required": [
+        "file",
+        "excerpt"
+      ],
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "excerpt": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

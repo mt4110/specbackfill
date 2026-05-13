@@ -35,6 +35,7 @@ This README is the English counterpart to the Japanese primary entry point. The 
 - v0 must stand on diff input alone. It does not depend on PR titles, PR descriptions, or issue context.
 - It is advisory-first. Until pilot evidence justifies stricter operation, do not position it primarily as a blocking gate.
 - Obligation/status JSON is available explicitly through the `--emit-obligations` versioned artifact. Normal `--format json` remains the findings contract.
+- When passing output to `local-ai-review`, `--emit-local-ai-review-import` emits JSONL for the deterministic static layer adapter. It does not create AI findings or PR comments.
 
 When paired with a local LLM review system such as `local-ai-review`, specbackfill should act as the deterministic static layer and emit companion obligation output. The AI layer may explain, organize, or store those findings, but specbackfill itself must not invent AI findings.
 
@@ -49,6 +50,7 @@ specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
                   [--summary]
                   [--explain]
                   [--emit-obligations]
+                  [--emit-local-ai-review-import]
 ```
 
 To inspect the implemented rules:
@@ -70,8 +72,10 @@ specbackfill fixtures report
 - `--summary`: shows only severity counts and fired rules. It does not change finding evaluation.
 - `--explain`: adds grounded explanations tied to existing findings. It does not add findings.
 - `--emit-obligations`: emits an `obligations.v1` JSON artifact with `schema_version`, `tool`, `run`, and `obligations`. The artifact also exposes companion evidence for `satisfied` obligations and reason/evidence for `suppressed` obligations. Omit `--format` or use `--format json`.
+- `--emit-local-ai-review-import`: emits `local_ai_review_import.v1` JSONL. Each line has deterministic item ID, run ID, rule ID, status, severity, title, diff-local evidence digest, and `source/import_kind`. Do not combine it with `--format`.
 - JSON findings include deterministic `finding_id` and `omission_signature` fields.
 - Normal `--format json` is the findings contract. The obligation/status artifact is a separate contract described by [schemas/obligations.schema.json](./schemas/obligations.schema.json).
+- The local-ai-review import JSONL adapter contract is described by [schemas/local_ai_review_import.schema.json](./schemas/local_ai_review_import.schema.json).
 - `rules`: shows implemented default v0 rule IDs, severities, intent, and expected companions. It does not evaluate a diff.
 - `fixtures`: shows synthetic fixture coverage by rule. It does not evaluate a diff.
 

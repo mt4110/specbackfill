@@ -35,6 +35,7 @@ specbackfill は、git diff から「この変更が発生させた **companion 
 - v0 は diff 入力だけで成立します。PR タイトルや issue 文脈には依存しません。
 - advisory-first です。pilot で有用性が確認されるまでは、blocking gate としての説明を前面に出しません。
 - obligation/status JSON は `--emit-obligations` の versioned artifact として明示的に出します。通常の `--format json` は findings 契約のままです。
+- `local-ai-review` に渡す場合は `--emit-local-ai-review-import` の JSONL を使えます。これは deterministic static layer の adapter であり、AI finding や PR comment は作りません。
 
 `local-ai-review` のようなローカル LLM レビュー基盤と併用する場合、specbackfill は deterministic static layer として companion obligation output を出し、AI 側はそれを説明・整理・履歴化する役割に留めます。specbackfill 自体は AI finding を発明しません。
 
@@ -49,6 +50,7 @@ specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
                   [--summary]
                   [--explain]
                   [--emit-obligations]
+                  [--emit-local-ai-review-import]
 ```
 
 実装済みルールを確認する場合は、次のコマンドを使います。
@@ -70,8 +72,10 @@ specbackfill fixtures report
 - `--summary`: severity counts と fired rules だけを表示します。finding 判定は変えません。
 - `--explain`: 既存 finding に紐づく grounded explanation を追加します。finding 自体は増やしません。
 - `--emit-obligations`: `schema_version`, `tool`, `run`, `obligations` を持つ `obligations.v1` JSON artifact を出します。`satisfied` の companion evidence と `suppressed` の reason/evidence もこの artifact で確認できます。`--format` は省略するか `--format json` を指定します。
+- `--emit-local-ai-review-import`: `local_ai_review_import.v1` JSONL を出します。各行は deterministic item ID、run ID、rule ID、status、severity、title、diff-local evidence digest、`source/import_kind` を持ちます。`--format` とは併用しません。
 - JSON findings には deterministic な `finding_id` と `omission_signature` が入ります。
 - 通常の `--format json` は findings 契約です。obligation/status artifact は [schemas/obligations.schema.json](./schemas/obligations.schema.json) に従う別契約です。
+- local-ai-review import JSONL は [schemas/local_ai_review_import.schema.json](./schemas/local_ai_review_import.schema.json) に従う adapter 契約です。
 - `rules`: 実装済み default v0 rule の ID、severity、意図、expected companions を表示します。diff は評価しません。
 - `fixtures`: synthetic fixture coverage を rule ごとに表示します。diff は評価しません。
 

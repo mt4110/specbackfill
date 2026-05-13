@@ -26,6 +26,7 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 	var includeExplanations bool
 	var summaryOnly bool
 	var emitObligations bool
+	var emitLocalAIReviewImport bool
 
 	flags.StringVar(&base, "base", "", "base git ref")
 	flags.StringVar(&head, "head", "", "head git ref")
@@ -35,6 +36,7 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 	flags.BoolVar(&includeExplanations, "explain", false, "include grounded explanations for emitted findings")
 	flags.BoolVar(&summaryOnly, "summary", false, "render summary-only output")
 	flags.BoolVar(&emitObligations, "emit-obligations", false, "emit versioned companion obligation artifact JSON")
+	flags.BoolVar(&emitLocalAIReviewImport, "emit-local-ai-review-import", false, "emit local-ai-review deterministic import JSONL")
 
 	if err := flags.Parse(args); err != nil {
 		if err == flag.ErrHelp {
@@ -46,7 +48,7 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 	if flags.NArg() != 0 {
 		return writeError(stderr, "unexpected positional arguments")
 	}
-	if err := validateFlags(base, head, diffFile, format, failOn, summaryOnly, includeExplanations, emitObligations, flagWasProvided(flags, "format")); err != nil {
+	if err := validateFlags(base, head, diffFile, format, failOn, summaryOnly, includeExplanations, emitObligations, emitLocalAIReviewImport, flagWasProvided(flags, "format")); err != nil {
 		return writeError(stderr, err.Error())
 	}
 
@@ -86,6 +88,20 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 		}, obligations)
 		if err := report.WriteObligationArtifact(stdout, artifact); err != nil {
 			return writeError(stderr, fmt.Sprintf("render obligation artifact: %v", err))
+		}
+		return report.ExitCode(result.Findings, failOn)
+	}
+
+	if emitLocalAIReviewImport {
+		artifact := report.BuildObligationArtifact(report.ObligationArtifactOptions{
+			InputKind: inputKind(base, head, diffFile),
+			Base:      base,
+			Head:      head,
+			DiffInput: diffInput,
+		}, obligations)
+		items := report.BuildLocalAIReviewImportItems(artifact)
+		if err := report.WriteLocalAIReviewImport(stdout, items); err != nil {
+			return writeError(stderr, fmt.Sprintf("render local-ai-review import: %v", err))
 		}
 		return report.ExitCode(result.Findings, failOn)
 	}
@@ -145,7 +161,7 @@ func inputNotes(base, head, diffFile string) []string {
 	}
 }
 
-func validateFlags(base, head, diffFile, format, failOn string, summaryOnly, includeExplanations, emitObligations, formatProvided bool) error {
+func validateFlags(base, head, diffFile, format, failOn string, summaryOnly, includeExplanations, emitObligations, emitLocalAIReviewImport, formatProvided bool) error {
 	switch format {
 	case "text", "json", "markdown":
 	default:
@@ -172,6 +188,18 @@ func validateFlags(base, head, diffFile, format, failOn string, summaryOnly, inc
 	}
 	if emitObligations && formatProvided && format != "json" {
 		return fmt.Errorf("--emit-obligations can only be combined with --format json")
+	}
+	if emitObligations && emitLocalAIReviewImport {
+		return fmt.Errorf("--emit-obligations cannot be combined with --emit-local-ai-review-import")
+	}
+	if emitLocalAIReviewImport && summaryOnly {
+		return fmt.Errorf("--emit-local-ai-review-import cannot be combined with --summary")
+	}
+	if emitLocalAIReviewImport && includeExplanations {
+		return fmt.Errorf("--emit-local-ai-review-import cannot be combined with --explain")
+	}
+	if emitLocalAIReviewImport && formatProvided {
+		return fmt.Errorf("--emit-local-ai-review-import cannot be combined with --format")
 	}
 
 	return nil

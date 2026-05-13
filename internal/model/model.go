@@ -230,6 +230,35 @@ type DownstreamMetadata struct {
 	SourceSignal string `json:"source_signal"`
 }
 
+type LocalAIReviewImportItem struct {
+	SchemaVersion      string                  `json:"schema_version"`
+	Source             string                  `json:"source"`
+	ImportKind         string                  `json:"import_kind"`
+	SourceSignal       string                  `json:"source_signal"`
+	ToolVersion        string                  `json:"tool_version"`
+	RunID              string                  `json:"run_id"`
+	InputKind          string                  `json:"input_kind"`
+	DiffFingerprint    string                  `json:"diff_fingerprint"`
+	ItemID             string                  `json:"item_id"`
+	ObligationID       string                  `json:"obligation_id"`
+	FindingID          *string                 `json:"finding_id"`
+	OmissionSignature  *string                 `json:"omission_signature"`
+	RuleID             string                  `json:"rule_id"`
+	RuleVersion        string                  `json:"rule_version"`
+	Status             ObligationStatus        `json:"status"`
+	Severity           Severity                `json:"severity"`
+	Confidence         string                  `json:"confidence"`
+	Title              string                  `json:"title"`
+	Why                string                  `json:"why"`
+	DiffLocalClaim     bool                    `json:"diff_local_claim"`
+	EvidenceDigest     string                  `json:"evidence_digest"`
+	Anchor             ObligationAnchor        `json:"anchor"`
+	RequiredCompanions []RequiredCompanion     `json:"required_companions"`
+	Evidence           []Evidence              `json:"evidence"`
+	StatusReason       *ObligationStatusReason `json:"status_reason,omitempty"`
+	Suppression        *ObligationSuppression  `json:"suppression"`
+}
+
 type Evidence struct {
 	File    string `json:"file"`
 	Line    int    `json:"line,omitempty"`
