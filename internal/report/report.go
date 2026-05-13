@@ -66,6 +66,113 @@ func BuildObligationArtifact(options ObligationArtifactOptions, obligations []mo
 	}
 }
 
+func BuildLocalAIReviewImportItems(artifact model.ObligationArtifact) []model.LocalAIReviewImportItem {
+	obligations := normalizeObligationsForImport(artifact.Obligations)
+	items := make([]model.LocalAIReviewImportItem, 0, len(obligations))
+
+	for _, obligation := range obligations {
+		items = append(items, model.LocalAIReviewImportItem{
+			SchemaVersion:      "local_ai_review_import.v1",
+			Source:             "specbackfill",
+			ImportKind:         "deterministic_static_layer",
+			SourceSignal:       "specbackfill",
+			ToolVersion:        artifact.Tool.Version,
+			RunID:              artifact.Run.RunID,
+			InputKind:          artifact.Run.InputKind,
+			DiffFingerprint:    artifact.Run.DiffFingerprint,
+			ItemID:             obligation.ObligationID,
+			ObligationID:       obligation.ObligationID,
+			FindingID:          obligation.FindingID,
+			OmissionSignature:  obligation.OmissionSignature,
+			RuleID:             obligation.RuleID,
+			RuleVersion:        obligation.RuleVersion,
+			Status:             obligation.Status,
+			Severity:           obligation.Severity,
+			Confidence:         obligation.Confidence,
+			Title:              obligation.Title,
+			Why:                obligation.Why,
+			DiffLocalClaim:     obligation.DiffLocalClaim,
+			EvidenceDigest:     stableEvidenceDigest(obligation),
+			Anchor:             obligation.Anchor,
+			RequiredCompanions: obligation.RequiredCompanions,
+			Evidence:           obligation.Evidence,
+			StatusReason:       obligation.StatusReason,
+			Suppression:        obligation.Suppression,
+		})
+	}
+
+	return items
+}
+
+func normalizeObligationsForImport(obligations []model.Obligation) []model.Obligation {
+	if obligations == nil {
+		return []model.Obligation{}
+	}
+
+	normalized := make([]model.Obligation, len(obligations))
+	copy(normalized, obligations)
+	for index := range normalized {
+		obligation := &normalized[index]
+		normalizeObligationArtifactSlices(obligation)
+		if obligation.ObligationID == "" {
+			obligation.ObligationID = stableObligationID(*obligation)
+		}
+		if obligation.Status == model.ObligationStatusSatisfied && obligation.StatusReason == nil {
+			satisfierEvidence := firstSatisfierEvidence(obligation.RequiredCompanions)
+			if len(satisfierEvidence) > 0 {
+				obligation.StatusReason = &model.ObligationStatusReason{
+					Reason:   model.StatusReasonCompanionPresent,
+					Evidence: satisfierEvidence,
+				}
+			}
+		}
+		if obligation.Status == model.ObligationStatusSuppressed && obligation.StatusReason == nil && obligation.Suppression != nil {
+			obligation.StatusReason = &model.ObligationStatusReason{
+				Reason:   model.StatusReason(obligation.Suppression.Reason),
+				Evidence: obligation.Suppression.Evidence,
+			}
+		}
+		if obligation.Status != model.ObligationStatusMissing {
+			obligation.FindingID = nil
+			obligation.OmissionSignature = nil
+			continue
+		}
+		if obligation.FindingID == nil {
+			findingID := stableFindingID(model.Finding{
+				RuleID:             obligation.RuleID,
+				Severity:           obligation.Severity,
+				Confidence:         obligation.Confidence,
+				Title:              obligation.Title,
+				Why:                obligation.Why,
+				Evidence:           obligation.Evidence,
+				ExpectedCompanions: importExpectedCompanions(*obligation),
+			})
+			obligation.FindingID = &findingID
+		}
+		if obligation.OmissionSignature == nil {
+			signature := omissionSignature(obligation.RuleID)
+			obligation.OmissionSignature = &signature
+		}
+	}
+
+	return normalized
+}
+
+func importExpectedCompanions(obligation model.Obligation) []string {
+	if len(obligation.ExpectedCompanions) > 0 {
+		return obligation.ExpectedCompanions
+	}
+
+	companions := make([]string, 0, len(obligation.RequiredCompanions))
+	for _, companion := range obligation.RequiredCompanions {
+		if companion.Kind == "" {
+			continue
+		}
+		companions = append(companions, companion.Kind)
+	}
+	return companions
+}
+
 func withFindingIDs(findings []model.Finding) []model.Finding {
 	withIDs := make([]model.Finding, len(findings))
 	copy(withIDs, findings)
@@ -238,6 +345,31 @@ func writeEvidenceFingerprint(hash io.Writer, prefix string, evidence []model.Ev
 		writeFingerprintField(hash, itemPrefix+"kind", item.Kind)
 		writeFingerprintField(hash, itemPrefix+"excerpt", item.Excerpt)
 	}
+}
+
+func stableEvidenceDigest(obligation model.Obligation) string {
+	hash := sha256.New()
+	writeFingerprintField(hash, "version", "specbackfill-local-ai-review-evidence-v1")
+	writeEvidenceFingerprint(hash, "anchor.evidence", obligation.Anchor.Evidence)
+	writeEvidenceFingerprint(hash, "obligation.evidence", obligation.Evidence)
+	writeFingerprintField(hash, "required_companion_count", strconv.Itoa(len(obligation.RequiredCompanions)))
+	for index, companion := range obligation.RequiredCompanions {
+		prefix := fmt.Sprintf("required_companion.%d.", index)
+		writeEvidenceFingerprint(hash, prefix+"satisfier_evidence", companion.SatisfierEvidence)
+	}
+	if obligation.StatusReason == nil {
+		writeFingerprintField(hash, "status_reason", "")
+	} else {
+		writeEvidenceFingerprint(hash, "status_reason.evidence", obligation.StatusReason.Evidence)
+	}
+	if obligation.Suppression == nil {
+		writeFingerprintField(hash, "suppression", "")
+	} else {
+		writeEvidenceFingerprint(hash, "suppression.evidence", obligation.Suppression.Evidence)
+	}
+
+	sum := fmt.Sprintf("%x", hash.Sum(nil))
+	return "sha256:" + sum
 }
 
 func diffFingerprint(input []byte) string {
@@ -449,6 +581,16 @@ func WriteObligationArtifact(w io.Writer, artifact model.ObligationArtifact) err
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(artifact)
+}
+
+func WriteLocalAIReviewImport(w io.Writer, items []model.LocalAIReviewImportItem) error {
+	encoder := json.NewEncoder(w)
+	for _, item := range items {
+		if err := encoder.Encode(item); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func writeMarkdown(w io.Writer, diff model.Diff, result model.Report, options Options) error {

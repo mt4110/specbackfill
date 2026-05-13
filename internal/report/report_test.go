@@ -3,6 +3,7 @@ package report
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 
@@ -400,6 +401,315 @@ func TestBuildObligationArtifactAddsVersionedMetadataAndIDs(t *testing.T) {
 	}
 }
 
+func TestBuildLocalAIReviewImportItems(t *testing.T) {
+	t.Parallel()
+
+	baseObligation := model.Obligation{
+		RuleID:         "DB001",
+		RuleVersion:    "v0",
+		Status:         model.ObligationStatusMissing,
+		Severity:       model.SeverityError,
+		Confidence:     "high",
+		Title:          "Schema changed, but no matching migration companion moved with this diff",
+		Why:            "Schema-affecting lines moved in the diff, but no matching migration companion evidence moved with them.",
+		DiffLocalClaim: true,
+		Anchor: model.ObligationAnchor{
+			Kind: "schema_change",
+			Path: "schema.prisma",
+			Line: intPtr(3),
+			Evidence: []model.Evidence{{
+				File:    "schema.prisma",
+				Line:    3,
+				Kind:    string(model.LineKindAdded),
+				Excerpt: "email String @unique",
+			}},
+		},
+		RequiredCompanions: []model.RequiredCompanion{{
+			Kind:          "migration_companion",
+			Status:        model.ObligationStatusMissing,
+			Satisfiers:    []string{},
+			ExpectedPaths: []string{"prisma/migrations/**"},
+		}},
+		Evidence: []model.Evidence{{
+			File:    "schema.prisma",
+			Line:    3,
+			Kind:    string(model.LineKindAdded),
+			Excerpt: "email String @unique",
+		}},
+		Downstream: model.DownstreamMetadata{
+			ImportKind:   "deterministic_static_layer",
+			SourceSignal: "specbackfill",
+		},
+		ExpectedCompanions: []string{"migration file"},
+	}
+	artifact := BuildObligationArtifact(ObligationArtifactOptions{
+		InputKind: "diff_file",
+		DiffInput: []byte("diff"),
+	}, []model.Obligation{baseObligation})
+	artifact.Tool.Name = "unexpected-tool-name"
+	artifact.Obligations[0].Downstream = model.DownstreamMetadata{
+		ImportKind:   "unexpected_import_kind",
+		SourceSignal: "unexpected_signal",
+	}
+
+	items := BuildLocalAIReviewImportItems(artifact)
+	if len(items) != 1 {
+		t.Fatalf("len(items) = %d, want 1", len(items))
+	}
+
+	item := items[0]
+	obligation := artifact.Obligations[0]
+	if item.SchemaVersion != "local_ai_review_import.v1" || item.Source != "specbackfill" || item.ImportKind != "deterministic_static_layer" {
+		t.Fatalf("import metadata = %+v, want local_ai_review_import.v1 specbackfill deterministic_static_layer", item)
+	}
+	if item.RunID != artifact.Run.RunID || item.DiffFingerprint != artifact.Run.DiffFingerprint {
+		t.Fatalf("run metadata = %+v, want artifact run %+v", item, artifact.Run)
+	}
+	if item.ItemID != obligation.ObligationID || item.ObligationID != obligation.ObligationID {
+		t.Fatalf("item IDs = item_id %q obligation_id %q, want %q", item.ItemID, item.ObligationID, obligation.ObligationID)
+	}
+	if item.FindingID == nil || item.OmissionSignature == nil {
+		t.Fatalf("missing import item did not preserve finding metadata: %+v", item)
+	}
+	if item.EvidenceDigest == "" || !strings.HasPrefix(item.EvidenceDigest, "sha256:") || len(item.EvidenceDigest) != len("sha256:")+64 {
+		t.Fatalf("EvidenceDigest = %q, want sha256 digest", item.EvidenceDigest)
+	}
+	if !item.DiffLocalClaim || len(item.Evidence) == 0 || len(item.Anchor.Evidence) == 0 || len(item.RequiredCompanions) == 0 {
+		t.Fatalf("import item lost diff-local evidence: %+v", item)
+	}
+}
+
+func TestBuildLocalAIReviewImportItemsPreservesDecodedArtifactIDs(t *testing.T) {
+	t.Parallel()
+
+	baseObligation := model.Obligation{
+		RuleID:         "DB001",
+		RuleVersion:    "v0",
+		Status:         model.ObligationStatusMissing,
+		Severity:       model.SeverityError,
+		Confidence:     "high",
+		Title:          "Schema changed, but no matching migration companion moved with this diff",
+		Why:            "Schema-affecting lines moved in the diff, but no matching migration companion evidence moved with them.",
+		DiffLocalClaim: true,
+		Anchor: model.ObligationAnchor{
+			Kind: "schema_change",
+			Path: "schema.prisma",
+			Line: intPtr(3),
+			Evidence: []model.Evidence{{
+				File:    "schema.prisma",
+				Line:    3,
+				Kind:    string(model.LineKindAdded),
+				Excerpt: "email String @unique",
+			}},
+		},
+		RequiredCompanions: []model.RequiredCompanion{{
+			Kind:          "migration_companion",
+			Status:        model.ObligationStatusMissing,
+			ExpectedPaths: []string{"prisma/migrations/**"},
+		}},
+		Evidence: []model.Evidence{{
+			File:    "schema.prisma",
+			Line:    3,
+			Kind:    string(model.LineKindAdded),
+			Excerpt: "email String @unique",
+		}},
+		ExpectedCompanions: []string{"migration file"},
+	}
+
+	artifact := BuildObligationArtifact(ObligationArtifactOptions{
+		InputKind: "diff_file",
+		DiffInput: []byte("diff"),
+	}, []model.Obligation{baseObligation})
+	wantObligation := artifact.Obligations[0]
+	if wantObligation.FindingID == nil || wantObligation.OmissionSignature == nil {
+		t.Fatalf("test setup missing generated finding metadata: %+v", wantObligation)
+	}
+
+	raw, err := json.Marshal(artifact)
+	if err != nil {
+		t.Fatalf("json.Marshal(artifact) error = %v", err)
+	}
+
+	var decoded model.ObligationArtifact
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal(artifact) error = %v", err)
+	}
+
+	items := BuildLocalAIReviewImportItems(decoded)
+	if len(items) != 1 {
+		t.Fatalf("len(items) = %d, want 1", len(items))
+	}
+	item := items[0]
+	if item.ObligationID != wantObligation.ObligationID || item.ItemID != wantObligation.ObligationID {
+		t.Fatalf("decoded artifact IDs changed: item=%+v want obligation ID %q", item, wantObligation.ObligationID)
+	}
+	if item.FindingID == nil || *item.FindingID != *wantObligation.FindingID {
+		t.Fatalf("decoded artifact finding ID = %v, want %v", item.FindingID, wantObligation.FindingID)
+	}
+	if item.OmissionSignature == nil || *item.OmissionSignature != *wantObligation.OmissionSignature {
+		t.Fatalf("decoded artifact omission signature = %v, want %v", item.OmissionSignature, wantObligation.OmissionSignature)
+	}
+}
+
+func TestLocalAIReviewEvidenceDigestChangesWithCompanionEvidence(t *testing.T) {
+	t.Parallel()
+
+	obligation := model.Obligation{
+		RuleID:         "DB001",
+		RuleVersion:    "v0",
+		Status:         model.ObligationStatusMissing,
+		Severity:       model.SeverityError,
+		Confidence:     "high",
+		Title:          "Schema changed",
+		Why:            "schema evidence moved",
+		DiffLocalClaim: true,
+		Anchor: model.ObligationAnchor{
+			Kind:     "schema_change",
+			Path:     "schema.prisma",
+			Evidence: []model.Evidence{{File: "schema.prisma", Line: 3, Kind: string(model.LineKindAdded), Excerpt: "email String @unique"}},
+		},
+		RequiredCompanions: []model.RequiredCompanion{{
+			Kind:          "migration_companion",
+			Status:        model.ObligationStatusMissing,
+			ExpectedPaths: []string{"prisma/migrations/**"},
+		}},
+		Evidence:           []model.Evidence{{File: "schema.prisma", Line: 3, Kind: string(model.LineKindAdded), Excerpt: "email String @unique"}},
+		ExpectedCompanions: []string{"migration file"},
+	}
+
+	missingArtifact := BuildObligationArtifact(ObligationArtifactOptions{InputKind: "diff_file", DiffInput: []byte("diff")}, []model.Obligation{obligation})
+	missingItem := BuildLocalAIReviewImportItems(missingArtifact)[0]
+
+	satisfied := obligation
+	satisfied.Status = model.ObligationStatusSatisfied
+	satisfied.RequiredCompanions[0].Status = model.ObligationStatusSatisfied
+	satisfied.RequiredCompanions[0].Satisfiers = []string{"prisma/migrations/20260329010101_add_email/migration.sql"}
+	satisfied.RequiredCompanions[0].SatisfierEvidence = []model.Evidence{{
+		File:    "prisma/migrations/20260329010101_add_email/migration.sql",
+		Line:    1,
+		Kind:    string(model.LineKindAdded),
+		Excerpt: "ALTER TABLE \"User\" ADD COLUMN \"email\" TEXT;",
+	}}
+	satisfiedArtifact := BuildObligationArtifact(ObligationArtifactOptions{InputKind: "diff_file", DiffInput: []byte("diff")}, []model.Obligation{satisfied})
+	satisfiedItem := BuildLocalAIReviewImportItems(satisfiedArtifact)[0]
+
+	if missingItem.ItemID != satisfiedItem.ItemID {
+		t.Fatalf("ItemID changed across status: missing=%q satisfied=%q", missingItem.ItemID, satisfiedItem.ItemID)
+	}
+	if missingItem.EvidenceDigest == satisfiedItem.EvidenceDigest {
+		t.Fatalf("EvidenceDigest did not change when companion evidence changed: %q", missingItem.EvidenceDigest)
+	}
+	if satisfiedItem.FindingID != nil || satisfiedItem.OmissionSignature != nil {
+		t.Fatalf("satisfied import item has finding metadata: %+v", satisfiedItem)
+	}
+}
+
+func TestLocalAIReviewImportSchemaDocumentsRequiredFields(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile("../../schemas/local_ai_review_import.schema.json")
+	if err != nil {
+		t.Fatalf("ReadFile(schema) error = %v", err)
+	}
+
+	var schema struct {
+		Properties map[string]any `json:"properties"`
+		Required   []string       `json:"required"`
+	}
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		t.Fatalf("json.Unmarshal(schema) error = %v", err)
+	}
+
+	for _, field := range []string{
+		"schema_version",
+		"source",
+		"import_kind",
+		"run_id",
+		"item_id",
+		"rule_id",
+		"status",
+		"severity",
+		"title",
+		"diff_local_claim",
+		"evidence_digest",
+	} {
+		if !containsString(schema.Required, field) {
+			t.Fatalf("schema required fields missing %q: %v", field, schema.Required)
+		}
+		if _, ok := schema.Properties[field]; !ok {
+			t.Fatalf("schema properties missing %q", field)
+		}
+	}
+}
+
+func TestLocalAIReviewImportGoldensContainSchemaRequiredFields(t *testing.T) {
+	t.Parallel()
+
+	required := localAIReviewImportSchemaRequiredFields(t)
+	entries, err := os.ReadDir("../../testdata/golden/local_ai_review_import")
+	if err != nil {
+		t.Fatalf("ReadDir(goldens) error = %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatalf("local-ai-review import goldens are empty")
+	}
+
+	for _, entry := range entries {
+		entry := entry
+		if entry.IsDir() {
+			continue
+		}
+		t.Run(entry.Name(), func(t *testing.T) {
+			t.Parallel()
+
+			raw, err := os.ReadFile("../../testdata/golden/local_ai_review_import/" + entry.Name())
+			if err != nil {
+				t.Fatalf("ReadFile(golden) error = %v", err)
+			}
+
+			lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+			for _, line := range lines {
+				var decoded map[string]any
+				if err := json.Unmarshal([]byte(line), &decoded); err != nil {
+					t.Fatalf("json.Unmarshal(golden line) error = %v\nline=%s", err, line)
+				}
+				for _, field := range required {
+					if _, ok := decoded[field]; !ok {
+						t.Fatalf("golden %s missing required field %q\nline=%s", entry.Name(), field, line)
+					}
+				}
+
+				var item model.LocalAIReviewImportItem
+				if err := json.Unmarshal([]byte(line), &item); err != nil {
+					t.Fatalf("json.Unmarshal(item) error = %v\nline=%s", err, line)
+				}
+				if item.SchemaVersion != "local_ai_review_import.v1" || item.Source != "specbackfill" || item.ImportKind != "deterministic_static_layer" || item.SourceSignal != "specbackfill" {
+					t.Fatalf("golden %s has invalid adapter identity: %+v", entry.Name(), item)
+				}
+				if !strings.HasPrefix(item.EvidenceDigest, "sha256:") || len(item.EvidenceDigest) != len("sha256:")+64 {
+					t.Fatalf("golden %s evidence digest = %q, want sha256 digest", entry.Name(), item.EvidenceDigest)
+				}
+				if item.Status == model.ObligationStatusSatisfied {
+					if item.StatusReason == nil || item.StatusReason.Reason != model.StatusReasonCompanionPresent || len(item.StatusReason.Evidence) == 0 {
+						t.Fatalf("golden %s satisfied item missing companion_present reason: %+v", entry.Name(), item)
+					}
+					if len(item.RequiredCompanions) == 0 || len(item.RequiredCompanions[0].Satisfiers) == 0 || len(item.RequiredCompanions[0].SatisfierEvidence) == 0 {
+						t.Fatalf("golden %s satisfied item missing satisfier evidence: %+v", entry.Name(), item)
+					}
+				}
+				if item.Status == model.ObligationStatusSuppressed {
+					if item.StatusReason == nil || len(item.StatusReason.Evidence) == 0 {
+						t.Fatalf("golden %s suppressed item missing status reason evidence: %+v", entry.Name(), item)
+					}
+					if item.Suppression == nil || len(item.Suppression.Evidence) == 0 {
+						t.Fatalf("golden %s suppressed item missing suppression evidence: %+v", entry.Name(), item)
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestBuildOverwritesGeneratedFindingMetadata(t *testing.T) {
 	t.Parallel()
 
@@ -427,6 +737,35 @@ func TestBuildOverwritesGeneratedFindingMetadata(t *testing.T) {
 
 func intPtr(value int) *int {
 	return &value
+}
+
+func localAIReviewImportSchemaRequiredFields(t *testing.T) []string {
+	t.Helper()
+
+	raw, err := os.ReadFile("../../schemas/local_ai_review_import.schema.json")
+	if err != nil {
+		t.Fatalf("ReadFile(schema) error = %v", err)
+	}
+
+	var schema struct {
+		Required []string `json:"required"`
+	}
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		t.Fatalf("json.Unmarshal(schema) error = %v", err)
+	}
+	if len(schema.Required) == 0 {
+		t.Fatalf("schema has no required fields")
+	}
+	return schema.Required
+}
+
+func containsString(values []string, needle string) bool {
+	for _, value := range values {
+		if value == needle {
+			return true
+		}
+	}
+	return false
 }
 
 func TestBuildAddsOmissionSignatureForEveryCatalogRule(t *testing.T) {
