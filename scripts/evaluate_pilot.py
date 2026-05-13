@@ -90,7 +90,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--allow-small-sample",
         action="store_true",
-        help="allow samples below 30 rows for smoke tests and dry runs",
+        help="allow samples below --min-sample-size for smoke tests and dry runs; archive checks still require a fair sample",
     )
     parser.add_argument(
         "--min-sample-size",
@@ -253,7 +253,8 @@ def evaluate(rows: list[dict[str, str]], args: argparse.Namespace) -> tuple[str,
     status_reason_rate = rate(status_reason_ok, len(status_reason_rows)) if status_reason_rows else 1.0
     hard_blocker_false_positive_rate = rate(hard_blocker_false_positive, len(error_rows))
 
-    sample_ok = total >= args.min_sample_size or args.allow_small_sample
+    fair_sample = total >= args.min_sample_size
+    sample_ok = fair_sample or args.allow_small_sample
     local_ai_review_import_ok = args.local_ai_review_import == "yes"
 
     continue_checks = {
@@ -270,12 +271,12 @@ def evaluate(rows: list[dict[str, str]], args: argparse.Namespace) -> tuple[str,
     }
 
     archive_reasons = []
-    if sample_ok and useful == 0:
+    if fair_sample and useful == 0:
         archive_reasons.append("AR-01: zero useful obligations after fair sample")
-    if sample_ok and false_positive_rate > 0.50 and args.suppression_iterations >= 2:
+    if fair_sample and false_positive_rate > 0.50 and args.suppression_iterations >= 2:
         archive_reasons.append("AR-02: false-positive rate > 50% after two suppression iterations")
     if (
-        sample_ok
+        fair_sample
         and duplicate_local_ai_review_rate >= 0.60
         and useful_rate < 0.20
         and args.unique_deterministic_artifact_value == "no"
@@ -294,6 +295,7 @@ def evaluate(rows: list[dict[str, str]], args: argparse.Namespace) -> tuple[str,
     metrics: dict[str, object] = {
         "total": total,
         "sample_ok": sample_ok,
+        "fair_sample": fair_sample,
         "local_ai_review_import": args.local_ai_review_import,
         "useful": useful,
         "useful_rate": useful_rate,
@@ -328,6 +330,7 @@ def print_report(decision: str, metrics: dict[str, object]) -> None:
     print()
     print(f"rows: {metrics['total']}")
     print(f"sample_ok: {str(metrics['sample_ok']).lower()}")
+    print(f"fair_sample: {str(metrics['fair_sample']).lower()}")
     print(f"local_ai_review_import: {metrics['local_ai_review_import']}")
     print()
     print("## metrics")
@@ -388,7 +391,7 @@ def main() -> int:
             raise ValueError("--suppression-iterations must be 0 or greater")
         rows = read_rows(Path(args.csv_path))
         decision, metrics = evaluate(rows, args)
-    except ValueError as error:
+    except (OSError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
 

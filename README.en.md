@@ -190,7 +190,7 @@ specbackfill check --diff-file change.diff --emit-local-ai-review-import --fail-
 python3 scripts/evaluate_pilot.py examples/pilot_scorecard.sample.csv --allow-small-sample --local-ai-review-import yes
 ```
 
-The scorecard contract is [schemas/pilot_scorecard.schema.json](./schemas/pilot_scorecard.schema.json), and the synthetic sample is [examples/pilot_scorecard.sample.csv](./examples/pilot_scorecard.sample.csv). The evaluator returns one decision: `continue`, `continue_advisory_only`, or `archive`. `--allow-small-sample` is for sample verification; a real pilot should use at least 30 rows.
+The scorecard contract is [schemas/pilot_scorecard.schema.json](./schemas/pilot_scorecard.schema.json), and the synthetic sample is [examples/pilot_scorecard.sample.csv](./examples/pilot_scorecard.sample.csv). The evaluator returns one decision: `continue`, `continue_advisory_only`, or `archive`. `--allow-small-sample` is for sample verification; `archive` decisions only apply after the sample reaches the real-pilot threshold.
 
 `make pilot-eval` uses defaults for checking the synthetic sample. For a real pilot, pass explicit values such as `PILOT_SCORECARD=...` and `PILOT_EVAL_ARGS='--local-ai-review-import yes'`.
 

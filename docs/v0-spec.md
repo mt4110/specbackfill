@@ -984,6 +984,9 @@ The evaluator script `scripts/evaluate_pilot.py` MAY compute a decision of
 operator-provided integration flags. That decision is an evaluation result, not
 a change to `specbackfill check` exit semantics.
 
+Small synthetic samples MAY opt into sample-size override for smoke testing,
+but archive decisions SHOULD require the real-pilot minimum sample size.
+
 Pilot scorecards committed to the public repository MUST be public-safe. They
 MUST NOT include raw private diffs, private PR bodies, private review text,
 secrets, personal data, or proprietary repository names. Real pilot scorecards
