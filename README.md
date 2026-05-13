@@ -192,6 +192,8 @@ python3 scripts/evaluate_pilot.py examples/pilot_scorecard.sample.csv --allow-sm
 
 scorecard 契約は [schemas/pilot_scorecard.schema.json](./schemas/pilot_scorecard.schema.json)、合成サンプルは [examples/pilot_scorecard.sample.csv](./examples/pilot_scorecard.sample.csv) にあります。判定は `continue`、`continue_advisory_only`、`archive` のいずれかです。`--allow-small-sample` はサンプル確認用で、実 pilot は 30 行以上を目安にします。
 
+`make pilot-eval` は合成サンプル確認用の既定値で動きます。実 pilot では `PILOT_SCORECARD=...` と `PILOT_EVAL_ARGS='--local-ai-review-import yes'` のように明示して使います。
+
 ## 実装済みルール
 
 - `DB001`: Schema changed, no migration moved with the diff

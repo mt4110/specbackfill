@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import argparse
 import csv
+import re
 import sys
 from collections import Counter
 from pathlib import Path
 
 
 SCHEMA_VERSION = "pilot_scorecard.v1"
+STABLE_OBLIGATION_ID_RE = re.compile(r"^obl-v1-[0-9a-f]{16}$")
 
 REQUIRED_COLUMNS = [
     "schema_version",
@@ -122,7 +124,11 @@ def parse_bool(raw: str, *, field: str, row_number: int) -> bool:
         return True
     if value in {"0", "false", "no", "n"}:
         return False
-    raise ValueError(f"row {row_number}: {field} must be true or false, got {raw!r}")
+    raise ValueError(
+        f"row {row_number}: {field} must be one of "
+        "'1', 'true', 'yes', 'y', '0', 'false', 'no', or 'n', "
+        f"got {raw!r}"
+    )
 
 
 def rate(numerator: int, denominator: int) -> float:
@@ -143,6 +149,9 @@ def read_rows(path: Path) -> list[dict[str, str]]:
         missing = [column for column in REQUIRED_COLUMNS if column not in reader.fieldnames]
         if missing:
             raise ValueError(f"CSV missing required columns: {', '.join(missing)}")
+        unexpected = [column for column in reader.fieldnames if column not in REQUIRED_COLUMNS]
+        if unexpected:
+            raise ValueError(f"CSV has unexpected columns: {', '.join(unexpected)}")
 
         rows = list(reader)
 
@@ -157,6 +166,9 @@ def read_rows(path: Path) -> list[dict[str, str]]:
 def validate_row(row: dict[str, str], row_number: int) -> None:
     if None in row:
         raise ValueError(f"row {row_number}: too many CSV columns; quote notes that contain commas")
+    omitted = [column for column in REQUIRED_COLUMNS if row.get(column) is None]
+    if omitted:
+        raise ValueError(f"row {row_number}: missing required values: {', '.join(omitted)}")
     if (row.get("schema_version") or "").strip() != SCHEMA_VERSION:
         raise ValueError(f"row {row_number}: schema_version must be {SCHEMA_VERSION}")
     for field in ["sample_id", "source_label", "sample_ref", "rule_id", "obligation_id"]:
@@ -214,7 +226,11 @@ def evaluate(rows: list[dict[str, str]], args: argparse.Namespace) -> tuple[str,
         rows, DUPLICATE_REVIEW_FIREWALL, "duplicate_with_review_firewall"
     )
     evidence_ok = sum(1 for row in rows if bool_value(row, "evidence_ok"))
-    stable_ids = sum(1 for row in rows if (row.get("obligation_id") or "").strip())
+    stable_ids = sum(
+        1
+        for row in rows
+        if STABLE_OBLIGATION_ID_RE.fullmatch((row.get("obligation_id") or "").strip())
+    )
 
     status_reason_rows = [
         row for row in rows if (row.get("status") or "").strip() in {"satisfied", "suppressed"}

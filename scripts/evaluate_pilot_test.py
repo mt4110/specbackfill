@@ -55,6 +55,32 @@ class EvaluatePilotTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "too many CSV columns"):
             evaluate_pilot.read_rows(path)
 
+    def test_unknown_header_columns_are_rejected(self) -> None:
+        record = row()
+        record["private_review_text"] = "should not be allowed"
+        path = temp_csv_path()
+        self.addCleanup(path.unlink, missing_ok=True)
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=evaluate_pilot.REQUIRED_COLUMNS + ["private_review_text"])
+            writer.writeheader()
+            writer.writerow(record)
+
+        with self.assertRaisesRegex(ValueError, "unexpected columns: private_review_text"):
+            evaluate_pilot.read_rows(path)
+
+    def test_missing_trailing_notes_value_is_rejected(self) -> None:
+        values = [row()[column] for column in evaluate_pilot.REQUIRED_COLUMNS[:-1]]
+        raw = ",".join(evaluate_pilot.REQUIRED_COLUMNS) + "\n" + ",".join(values) + "\n"
+        path = write_raw_csv(raw)
+        self.addCleanup(path.unlink, missing_ok=True)
+
+        with self.assertRaisesRegex(ValueError, "missing required values: notes"):
+            evaluate_pilot.read_rows(path)
+
+    def test_invalid_bool_message_lists_allowed_values(self) -> None:
+        with self.assertRaisesRegex(ValueError, "'1', 'true', 'yes', 'y'"):
+            evaluate_pilot.parse_bool("maybe", field="evidence_ok", row_number=2)
+
 
 def args(**overrides: object) -> SimpleNamespace:
     values = {
@@ -75,7 +101,7 @@ def row(**overrides: str) -> dict[str, str]:
         "source_label": "sample-service",
         "sample_ref": "synthetic-diff",
         "rule_id": "DB001",
-        "obligation_id": "obl-v1-sample",
+        "obligation_id": "obl-v1-0000000000000001",
         "status": "missing",
         "severity": "warn",
         "operator_verdict": "useful_noted",

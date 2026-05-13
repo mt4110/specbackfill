@@ -1,7 +1,7 @@
 schema_version,sample_id,source_label,sample_ref,rule_id,obligation_id,status,severity,operator_verdict,fp_reason,was_actioned,duplicate_with_local_ai_review,duplicate_with_review_firewall,evidence_ok,status_reason_ok,notes
-pilot_scorecard.v1,S001,sample-service-a,synthetic-diff-001,DB001,obl-v1-sample001,missing,error,useful_fixed,,true,false,false,true,true,Migration companion was added after the finding.
-pilot_scorecard.v1,S002,sample-service-a,synthetic-diff-002,CFG001,obl-v1-sample002,satisfied,warn,useful_noted,,false,false,false,true,true,Satisfied obligation made companion movement visible.
-pilot_scorecard.v1,S003,sample-service-b,synthetic-diff-003,API001,obl-v1-sample003,missing,warn,false_positive,generated_only,false,false,false,true,true,Generated-only surface should be suppressed.
-pilot_scorecard.v1,S004,sample-service-b,synthetic-diff-004,AUTH001,obl-v1-sample004,missing,warn,duplicate_with_local_ai_review,,false,true,false,true,true,local-ai-review already surfaced the same authz test gap.
-pilot_scorecard.v1,S005,sample-service-c,synthetic-diff-005,OPS001,obl-v1-sample005,suppressed,warn,useful_noted,,false,false,false,true,true,Suppression reason was clear enough to increase trust.
-pilot_scorecard.v1,S006,sample-service-c,synthetic-diff-006,ERR001,obl-v1-sample006,missing,warn,duplicate_with_review_firewall,,false,false,true,true,true,Existing review-signal triage already covered the same item.
+pilot_scorecard.v1,S001,sample-service-a,synthetic-diff-001,DB001,obl-v1-0000000000000001,missing,error,useful_fixed,,true,false,false,true,true,Migration companion was added after the finding.
+pilot_scorecard.v1,S002,sample-service-a,synthetic-diff-002,CFG001,obl-v1-0000000000000002,satisfied,warn,useful_noted,,false,false,false,true,true,Satisfied obligation made companion movement visible.
+pilot_scorecard.v1,S003,sample-service-b,synthetic-diff-003,API001,obl-v1-0000000000000003,missing,warn,false_positive,generated_only,false,false,false,true,true,Generated-only surface should be suppressed.
+pilot_scorecard.v1,S004,sample-service-b,synthetic-diff-004,AUTH001,obl-v1-0000000000000004,missing,warn,duplicate_with_local_ai_review,,false,true,false,true,true,local-ai-review already surfaced the same authz test gap.
+pilot_scorecard.v1,S005,sample-service-c,synthetic-diff-005,OPS001,obl-v1-0000000000000005,suppressed,warn,useful_noted,,false,false,false,true,true,Suppression reason was clear enough to increase trust.
+pilot_scorecard.v1,S006,sample-service-c,synthetic-diff-006,ERR001,obl-v1-0000000000000006,missing,warn,duplicate_with_review_firewall,,false,false,true,true,true,Existing review-signal triage already covered the same item.

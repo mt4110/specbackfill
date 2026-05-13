@@ -9,6 +9,7 @@ DIFF ?=
 FORMAT ?= text
 RULE ?= DB001
 PILOT_SCORECARD ?= examples/pilot_scorecard.sample.csv
+PILOT_EVAL_ARGS ?= --allow-small-sample --local-ai-review-import yes
 
 .DEFAULT_GOAL := help
 
@@ -28,7 +29,7 @@ help:
 		'  make rules                  List implemented rules' \
 		'  make rule [RULE=DB001]      Show one rule' \
 		'  make fixtures               Show fixture coverage' \
-		'  make pilot-eval [PILOT_SCORECARD=...]  Evaluate a pilot scorecard CSV' \
+		'  make pilot-eval [PILOT_SCORECARD=... PILOT_EVAL_ARGS=...]  Evaluate a pilot scorecard CSV' \
 		'  make test                   Run tests'
 
 install:
@@ -106,4 +107,4 @@ fixtures:
 	@$(SPECBACKFILL) fixtures report
 
 pilot-eval:
-	@python3 scripts/evaluate_pilot.py "$(PILOT_SCORECARD)"
+	@python3 scripts/evaluate_pilot.py "$(PILOT_SCORECARD)" $(PILOT_EVAL_ARGS)
