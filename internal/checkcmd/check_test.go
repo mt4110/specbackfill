@@ -79,6 +79,53 @@ func TestRunMalformedDiffFile(t *testing.T) {
 	}
 }
 
+func TestInputSummaryAndNotes(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name        string
+		base        string
+		head        string
+		diffFile    string
+		wantSummary string
+		wantNote    string
+	}{
+		{
+			name:        "working tree",
+			wantSummary: "working tree diff (tracked changes)",
+			wantNote:    "untracked files are not included unless staged with git add -N",
+		},
+		{
+			name:        "git range",
+			base:        "main",
+			head:        "HEAD",
+			wantSummary: "git range diff (main..HEAD)",
+			wantNote:    "working tree changes are not included in --base/--head mode",
+		},
+		{
+			name:        "diff file",
+			diffFile:    "change.diff",
+			wantSummary: "diff file",
+			wantNote:    "only the provided unified diff file was evaluated",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := inputSummary(tc.base, tc.head, tc.diffFile); got != tc.wantSummary {
+				t.Fatalf("inputSummary() = %q, want %q", got, tc.wantSummary)
+			}
+			notes := inputNotes(tc.base, tc.head, tc.diffFile)
+			if len(notes) != 1 || notes[0] != tc.wantNote {
+				t.Fatalf("inputNotes() = %v, want [%q]", notes, tc.wantNote)
+			}
+		})
+	}
+}
+
 func TestRunDiffFileJSON(t *testing.T) {
 	t.Parallel()
 

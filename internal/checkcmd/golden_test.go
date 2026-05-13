@@ -145,6 +145,9 @@ func TestCrossSourceOutputEquivalence(t *testing.T) {
 			if workingTextCode != 0 || workingTextStderr != "" {
 				t.Fatalf("working text failed: code=%d stderr=%q", workingTextCode, workingTextStderr)
 			}
+			if !strings.Contains(workingText, "input: working tree diff (tracked changes)") {
+				t.Fatalf("working text missing input summary:\n%s", workingText)
+			}
 			if workingJSONCode != 0 || workingJSONStderr != "" {
 				t.Fatalf("working json failed: code=%d stderr=%q", workingJSONCode, workingJSONStderr)
 			}
@@ -168,6 +171,9 @@ func TestCrossSourceOutputEquivalence(t *testing.T) {
 			if rangeTextCode != 0 || rangeTextStderr != "" {
 				t.Fatalf("range text failed: code=%d stderr=%q", rangeTextCode, rangeTextStderr)
 			}
+			if !strings.Contains(rangeText, "input: git range diff (") {
+				t.Fatalf("range text missing input summary:\n%s", rangeText)
+			}
 			if rangeJSONCode != 0 || rangeJSONStderr != "" {
 				t.Fatalf("range json failed: code=%d stderr=%q", rangeJSONCode, rangeJSONStderr)
 			}
@@ -188,6 +194,9 @@ func TestCrossSourceOutputEquivalence(t *testing.T) {
 			if diffTextCode != 0 || diffTextStderr != "" {
 				t.Fatalf("diff-file text failed: code=%d stderr=%q", diffTextCode, diffTextStderr)
 			}
+			if !strings.Contains(diffText, "input: diff file") {
+				t.Fatalf("diff-file text missing input summary:\n%s", diffText)
+			}
 			if diffJSONCode != 0 || diffJSONStderr != "" {
 				t.Fatalf("diff-file json failed: code=%d stderr=%q", diffJSONCode, diffJSONStderr)
 			}
@@ -198,16 +207,19 @@ func TestCrossSourceOutputEquivalence(t *testing.T) {
 				t.Fatalf("diff-file summary failed: code=%d stderr=%q", diffSummaryCode, diffSummaryStderr)
 			}
 
-			if workingText != rangeText || workingText != diffText {
+			if normalizeHumanOutputForSourceEquivalence(workingText) != normalizeHumanOutputForSourceEquivalence(rangeText) ||
+				normalizeHumanOutputForSourceEquivalence(workingText) != normalizeHumanOutputForSourceEquivalence(diffText) {
 				t.Fatalf("text outputs differ\nworking:\n%s\nrange:\n%s\ndiff-file:\n%s", workingText, rangeText, diffText)
 			}
 			if workingJSON != rangeJSON || workingJSON != diffJSON {
 				t.Fatalf("json outputs differ\nworking:\n%s\nrange:\n%s\ndiff-file:\n%s", workingJSON, rangeJSON, diffJSON)
 			}
-			if workingMarkdown != rangeMarkdown || workingMarkdown != diffMarkdown {
+			if normalizeHumanOutputForSourceEquivalence(workingMarkdown) != normalizeHumanOutputForSourceEquivalence(rangeMarkdown) ||
+				normalizeHumanOutputForSourceEquivalence(workingMarkdown) != normalizeHumanOutputForSourceEquivalence(diffMarkdown) {
 				t.Fatalf("markdown outputs differ\nworking:\n%s\nrange:\n%s\ndiff-file:\n%s", workingMarkdown, rangeMarkdown, diffMarkdown)
 			}
-			if workingSummary != rangeSummary || workingSummary != diffSummary {
+			if normalizeHumanOutputForSourceEquivalence(workingSummary) != normalizeHumanOutputForSourceEquivalence(rangeSummary) ||
+				normalizeHumanOutputForSourceEquivalence(workingSummary) != normalizeHumanOutputForSourceEquivalence(diffSummary) {
 				t.Fatalf("summary outputs differ\nworking:\n%s\nrange:\n%s\ndiff-file:\n%s", workingSummary, rangeSummary, diffSummary)
 			}
 
@@ -229,6 +241,21 @@ func TestCrossSourceOutputEquivalence(t *testing.T) {
 			}
 		})
 	}
+}
+
+func normalizeHumanOutputForSourceEquivalence(output string) string {
+	lines := strings.Split(output, "\n")
+	kept := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if strings.HasPrefix(line, "input: ") ||
+			strings.HasPrefix(line, "note: ") ||
+			strings.HasPrefix(line, "- Input: ") ||
+			strings.HasPrefix(line, "- Note: ") {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n")
 }
 
 func runCheckOutput(t *testing.T, cwd string, args []string) (string, int, string) {

@@ -1,5 +1,10 @@
 specbackfill check
+input: diff file
+note: only the provided unified diff file was evaluated
 changed files: 1
+changed file summary:
+  - Go source: 1
+    - internal/auth/permissions.go
 findings: error=0 warn=1 info=0
 [warn] AUTH001 Authn/Authz branch changed, but no matching allow/deny or security-sensitive note companion moved with this diff
   why: Authorization-sensitive lines moved in the diff, but no matching allow/deny test or security-sensitive note evidence moved with them.

@@ -74,12 +74,39 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 		result.Explanations = explain.Build(findings)
 	}
 
-	options := report.Options{SummaryOnly: summaryOnly}
+	options := report.Options{
+		SummaryOnly:         summaryOnly,
+		InputSummary:        inputSummary(base, head, diffFile),
+		InputNotes:          inputNotes(base, head, diffFile),
+		AnchorScanAvailable: true,
+		AnchorRuleIDs:       rules.ScanAnchorRuleIDs(diff),
+	}
 	if err := report.WriteWithOptions(stdout, format, diff, result, options); err != nil {
 		return writeError(stderr, fmt.Sprintf("render report: %v", err))
 	}
 
 	return report.ExitCode(result.Findings, failOn)
+}
+
+func inputSummary(base, head, diffFile string) string {
+	if diffFile != "" {
+		return "diff file"
+	}
+	if base != "" && head != "" {
+		return fmt.Sprintf("git range diff (%s..%s)", base, head)
+	}
+	return "working tree diff (tracked changes)"
+}
+
+func inputNotes(base, head, diffFile string) []string {
+	switch {
+	case diffFile != "":
+		return []string{"only the provided unified diff file was evaluated"}
+	case base != "" && head != "":
+		return []string{"working tree changes are not included in --base/--head mode"}
+	default:
+		return []string{"untracked files are not included unless staged with git add -N"}
+	}
 }
 
 func validateFlags(base, head, diffFile, format, failOn string) error {

@@ -1,5 +1,10 @@
 specbackfill check
+input: diff file
+note: only the provided unified diff file was evaluated
 changed files: 1
+changed file summary:
+  - Go source: 1
+    - internal/config/load.go
 findings: error=0 warn=1 info=0
 [warn] CFG001 New config detected, but no matching docs/default companion moved with this diff
   why: A new config/env/flag line moved in the diff, but no matching docs/default companion evidence moved with it.

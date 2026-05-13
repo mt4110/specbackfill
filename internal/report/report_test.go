@@ -30,8 +30,81 @@ func TestWriteTextSkeleton(t *testing.T) {
 	if !strings.Contains(text, "changed files: 1") {
 		t.Fatalf("text output missing changed file count:\n%s", text)
 	}
+	if !strings.Contains(text, "changed file summary:") || !strings.Contains(text, "- other: 1") {
+		t.Fatalf("text output missing changed file summary:\n%s", text)
+	}
+	if !strings.Contains(text, "    - dir/file.txt") {
+		t.Fatalf("text output missing changed file sample:\n%s", text)
+	}
 	if !strings.Contains(text, "No findings emitted.") {
 		t.Fatalf("text output missing empty findings message:\n%s", text)
+	}
+}
+
+func TestFileSummaryRows(t *testing.T) {
+	t.Parallel()
+
+	diff := model.Diff{Files: []model.File{
+		{Path: "schema.prisma"},
+		{Path: "prisma/migrations/20260512010101_add_user/migration.sql"},
+		{Path: "openapi.yaml"},
+		{Path: "generated/openapi/client.gen.ts"},
+		{Path: "docs/usage.md"},
+		{Path: "internal/api/handler_test.go"},
+		{Path: "testdata/golden/text/db001_positive.golden"},
+		{Path: ".github/workflows/ci.yaml"},
+		{Path: "scripts/check.sh"},
+		{Path: "internal/server/main.go"},
+		{Path: "internal/server/router.go"},
+		{Path: "internal/server/store.go"},
+		{Path: "internal/server/worker.go"},
+		{Path: "crates/domain/src/lib.rs"},
+		{Path: "web/src/app.tsx"},
+		{Path: "web/src/app.js"},
+		{Path: "tools/load.py"},
+		{Path: "queries/report.sql"},
+		{Path: "examples/config.go"},
+		{Path: "assets/logo.png"},
+	}}
+
+	rows := fileSummaryRows(diff)
+	got := map[string]int{}
+	byLabel := map[string]fileSummaryRow{}
+	for _, row := range rows {
+		got[row.label] = row.count
+		byLabel[row.label] = row
+	}
+
+	for _, want := range []fileSummaryRow{
+		{label: "db schema", count: 1},
+		{label: "migrations", count: 1},
+		{label: "API specs", count: 1},
+		{label: "generated", count: 1},
+		{label: "docs", count: 1},
+		{label: "tests", count: 1},
+		{label: "test fixtures", count: 1},
+		{label: "config/ci", count: 1},
+		{label: "scripts", count: 1},
+		{label: "Go source", count: 4},
+		{label: "Rust source", count: 1},
+		{label: "TypeScript source", count: 1},
+		{label: "JavaScript source", count: 1},
+		{label: "Python source", count: 1},
+		{label: "SQL", count: 1},
+		{label: "examples/samples", count: 1},
+		{label: "other", count: 1},
+	} {
+		if got[want.label] != want.count {
+			t.Fatalf("summary %q = %d, want %d; rows=%+v", want.label, got[want.label], want.count, rows)
+		}
+	}
+
+	goSource := byLabel["Go source"]
+	if len(goSource.samples) != maxFileSummarySamples {
+		t.Fatalf("Go source samples = %v, want %d samples", goSource.samples, maxFileSummarySamples)
+	}
+	if strings.Join(goSource.samples, ",") != "internal/server/main.go,internal/server/router.go,internal/server/store.go" {
+		t.Fatalf("Go source samples = %v, want first changed files", goSource.samples)
 	}
 }
 

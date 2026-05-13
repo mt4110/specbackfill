@@ -1,5 +1,10 @@
 specbackfill check
+input: diff file
+note: only the provided unified diff file was evaluated
 changed files: 1
+changed file summary:
+  - generated: 1
+    - generated/openapi/client.gen.ts
 findings: error=0 warn=1 info=0
 [warn] DOC001 Generated spec/client changed, but no matching human-facing explanation moved with this diff
   why: A generated API/spec client artifact moved in the diff, but no matching human-facing explanation evidence moved with it.
