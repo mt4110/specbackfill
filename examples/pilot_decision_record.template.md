@@ -25,6 +25,15 @@ If this record will be committed, use `public-safe aggregate` or `none` for
 `Scorecard source`. Keep `local/private aggregate` only in uncommitted local
 records.
 
+## Commit Gate
+
+- [ ] A real pilot was evaluated into a public-safe aggregate, or the record
+      stays `Pilot status: not_run` / `Decision: pending`.
+- [ ] Evaluated metrics are copied from `scripts/evaluate_pilot.py` output, not
+      inferred from intuition or synthetic samples.
+- [ ] If no public-safe aggregate exists, do not commit a filled evaluated
+      decision record.
+
 ## Public Safety
 
 - [ ] Contains only anonymous labels and aggregate metrics.

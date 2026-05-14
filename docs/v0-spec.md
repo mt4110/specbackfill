@@ -1015,6 +1015,11 @@ or pending. It MUST NOT infer, invent, or backfill metric values from intuition
 or from the synthetic sample. The synthetic sample MAY verify the workflow, but
 MUST NOT be used as the evidence base for a pilot decision.
 
+If real pilot rows have not been evaluated into a public-safe aggregate, an
+evaluated pilot decision record SHOULD NOT be committed. The project SHOULD
+remain advisory-only with `Decision: pending` until public-safe aggregate
+evidence exists.
+
 `continue`, `continue_advisory_only`, and `archive` decisions SHOULD correspond
 to the evaluator output and the strategy thresholds. Archive decisions SHOULD
 only be treated as terminal after the real-pilot sample threshold is met.
