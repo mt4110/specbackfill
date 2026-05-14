@@ -1,0 +1,140 @@
+{
+  "schema_version": "obligations.v1",
+  "tool": {
+    "name": "specbackfill",
+    "version": "v0"
+  },
+  "run": {
+    "run_id": "run-2f9c8dd288a126b6",
+    "input_kind": "diff_file",
+    "base": null,
+    "head": null,
+    "diff_fingerprint": "sha256:2f9c8dd288a126b64b727dedecbeb707d7eb4b8b112adf3da45e22c135517299"
+  },
+  "obligations": [
+    {
+      "obligation_id": "obl-v1-8a792d4e301c729e",
+      "finding_id": null,
+      "omission_signature": null,
+      "rule_id": "DB001",
+      "rule_version": "v0",
+      "status": "satisfied",
+      "severity": "error",
+      "confidence": "high",
+      "title": "Schema changed and matching migration companion moved with this diff",
+      "why": "Schema-affecting lines moved in the diff, and matching migration companion evidence moved with them.",
+      "diff_local_claim": true,
+      "anchor": {
+        "kind": "schema_change",
+        "path": "schema.prisma",
+        "line": 3,
+        "evidence": [
+          {
+            "file": "schema.prisma",
+            "line": 3,
+            "kind": "added",
+            "excerpt": "email String"
+          }
+        ]
+      },
+      "required_companions": [
+        {
+          "kind": "migration_companion",
+          "status": "satisfied",
+          "satisfiers": [
+            "prisma/migrations/20260329030303_add_user_email/migration.sql"
+          ],
+          "satisfier_evidence": [
+            {
+              "file": "prisma/migrations/20260329030303_add_user_email/migration.sql",
+              "line": 1,
+              "kind": "added",
+              "excerpt": "ALTER TABLE \"User\" ADD COLUMN \"email\" TEXT;"
+            }
+          ],
+          "expected_paths": [
+            "migrations/**",
+            "db/migrations/**",
+            "prisma/migrations/**"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "file": "schema.prisma",
+          "line": 3,
+          "kind": "added",
+          "excerpt": "email String"
+        }
+      ],
+      "status_reason": {
+        "reason": "companion_present",
+        "evidence": [
+          {
+            "file": "prisma/migrations/20260329030303_add_user_email/migration.sql",
+            "line": 1,
+            "kind": "added",
+            "excerpt": "ALTER TABLE \"User\" ADD COLUMN \"email\" TEXT;"
+          }
+        ]
+      },
+      "suppression": null,
+      "downstream": {
+        "import_kind": "deterministic_static_layer",
+        "source_signal": "specbackfill"
+      }
+    },
+    {
+      "obligation_id": "obl-v1-6484ff1422915b32",
+      "finding_id": "v0-b58c2fa1fc3f637b",
+      "omission_signature": "db001.schema_changed.migration_companion",
+      "rule_id": "DB001",
+      "rule_version": "v0",
+      "status": "missing",
+      "severity": "error",
+      "confidence": "high",
+      "title": "Schema changed, but no matching migration companion moved with this diff",
+      "why": "Schema-affecting lines moved in the diff, but no matching migration companion evidence moved with them.",
+      "diff_local_claim": true,
+      "anchor": {
+        "kind": "schema_change",
+        "path": "schema.prisma",
+        "line": 8,
+        "evidence": [
+          {
+            "file": "schema.prisma",
+            "line": 8,
+            "kind": "added",
+            "excerpt": "slug String"
+          }
+        ]
+      },
+      "required_companions": [
+        {
+          "kind": "migration_companion",
+          "status": "missing",
+          "satisfiers": [],
+          "satisfier_evidence": [],
+          "expected_paths": [
+            "migrations/**",
+            "db/migrations/**",
+            "prisma/migrations/**"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "file": "schema.prisma",
+          "line": 8,
+          "kind": "added",
+          "excerpt": "slug String"
+        }
+      ],
+      "suppression": null,
+      "downstream": {
+        "import_kind": "deterministic_static_layer",
+        "source_signal": "specbackfill"
+      }
+    }
+  ]
+}

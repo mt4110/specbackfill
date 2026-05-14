@@ -15,7 +15,7 @@
   },
   "findings": [
     {
-      "finding_id": "v0-82e2676f0c6030e7",
+      "finding_id": "v0-c81e374cf584324b",
       "omission_signature": "db001.schema_changed.migration_companion",
       "rule_id": "DB001",
       "severity": "error",
@@ -31,9 +31,7 @@
         }
       ],
       "expected_companions": [
-        "migration file",
-        "migration test",
-        "rollback/backfill note"
+        "migration file"
       ]
     },
     {
@@ -64,7 +62,7 @@
       "finding_index": 0,
       "rule_id": "DB001",
       "source": "grounded-finding-explanation",
-      "summary": "This explains the existing DB001 finding: Schema changed, but no matching migration companion moved with this diff. The explanation is grounded in diff-local evidence: schema.prisma:3:+ nickname String. Expected companion categories remain: migration file, migration test, rollback/backfill note. It does not claim repository-wide absence.",
+      "summary": "This explains the existing DB001 finding: Schema changed, but no matching migration companion moved with this diff. The explanation is grounded in diff-local evidence: schema.prisma:3:+ nickname String. Expected companion categories remain: migration file. It does not claim repository-wide absence.",
       "evidence": [
         {
           "file": "schema.prisma",
@@ -74,9 +72,7 @@
         }
       ],
       "expected_companions": [
-        "migration file",
-        "migration test",
-        "rollback/backfill note"
+        "migration file"
       ]
     },
     {

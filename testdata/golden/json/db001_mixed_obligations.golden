@@ -15,7 +15,7 @@
   },
   "findings": [
     {
-      "finding_id": "v0-8362254e793872c2",
+      "finding_id": "v0-b58c2fa1fc3f637b",
       "omission_signature": "db001.schema_changed.migration_companion",
       "rule_id": "DB001",
       "severity": "error",
@@ -25,9 +25,9 @@
       "evidence": [
         {
           "file": "schema.prisma",
-          "line": 3,
+          "line": 8,
           "kind": "added",
-          "excerpt": "email String @unique"
+          "excerpt": "slug String"
         }
       ],
       "expected_companions": [

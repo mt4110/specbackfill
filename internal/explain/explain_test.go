@@ -20,7 +20,7 @@ func TestBuildGroundsExplanationInExistingFinding(t *testing.T) {
 			Evidence: []model.Evidence{
 				{File: "schema.prisma", Line: 3, Kind: string(model.LineKindAdded), Excerpt: "email String @unique"},
 			},
-			ExpectedCompanions: []string{"migration file", "migration test", "rollback/backfill note"},
+			ExpectedCompanions: []string{"migration file"},
 		},
 	}
 

@@ -52,6 +52,8 @@ Status terms MUST remain diff-local. `unknown` MUST NOT be reported as `missing`
 
 Normal user-facing findings are the unresolved `missing` side of the obligation model. They MUST keep the required finding fields defined in this document.
 
+Current v0 reserves `unknown` for a future rule state and the default rule pack does not emit it. When a default v0 rule cannot confidently decide status from diff evidence, it SHOULD either emit no obligation or emit a documented `suppressed` obligation when a negative condition is visible. `unknown` MUST remain non-finding output unless a future version explicitly changes that contract.
+
 ### Allowed wording
 
 - "Schema changed, but no migration moved with this diff."
@@ -357,6 +359,7 @@ Line numbers MAY be included when available.
 `expected_companions` is the list of artifact categories the tool believes should likely have moved with the diff.
 
 These are categories, not strict file paths.
+For obligation artifacts, hard machine-readable companion requirements live in `required_companions`. Finding-level `expected_companions` SHOULD NOT list recommended follow-up categories as if they were required unless the rule actually evaluates those categories as obligations.
 
 Examples include:
 
@@ -469,8 +472,6 @@ Recommended shape:
     - prisma/schema.prisma:+ email String @unique
   expected companions:
     - migration file
-    - migration test
-    - rollback/backfill note
 ```
 
 ### 8.2 JSON output
@@ -514,9 +515,7 @@ Recommended structure:
         }
       ],
       "expected_companions": [
-        "migration file",
-        "migration test",
-        "rollback/backfill note"
+        "migration file"
       ]
     }
   ]
@@ -569,6 +568,10 @@ include at least:
 - `required_companions`
 - `evidence`
 - `diff_local_claim`
+
+Rules MAY emit zero or more obligations. Status is assigned per obligation
+anchor group, not per rule globally, so one rule can emit both `satisfied` and
+`missing` obligations for different anchors in the same diff.
 
 When an obligation is `satisfied`, companion-present evidence MUST be visible
 from `required_companions[*].satisfier_evidence` and summarized by
@@ -703,7 +706,7 @@ The default v0 rule pack includes the following rules.
 
 | Rule | Intent | Expected companions | Severity guidance |
 | --- | --- | --- | --- |
-| `DB001` | schema changed, but no migration companion moved | migration file, migration test, rollback/backfill note | usually `error` when the migration companion is missing |
+| `DB001` | schema changed, but no migration companion moved | migration file | usually `error` when the migration companion is missing |
 | `DB002` | destructive storage change without explicit safety path | rollback note, data backfill note, compatibility test | `warn` to `error` depending on confidence and destructive strength |
 | `API001` | public API changed without contract verification | contract test, API docs, compatibility or deprecation note | usually `warn`; MAY be `error` for clearly breaking changes |
 | `CFG001` | new config/env/flag introduced without docs/default handling | docs, default value handling, upgrade note | generally `warn` |
@@ -731,16 +734,20 @@ Detect a persisted data shape change whose diff does not include a migration com
   - `ADD COLUMN`
   - `CREATE INDEX`
 
-**Expected companions**
+**Required companion**
 
 - migration file
+
+**Recommended follow-ups**
+
 - migration test
 - rollback/backfill note
+
+Current v0 DB001 treats the migration file as the required companion. Migration tests and rollback/backfill notes are recommended follow-ups for higher-risk schema changes, but DB001 does not emit separate missing findings for them unless a future version adds atomic companion statuses.
 
 **Severity guidance**
 
 - If no migration companion is present, severity SHOULD be `error`.
-- If a migration exists but migration test or rollback/backfill note is absent, severity SHOULD be `warn`.
 
 ### 9.3 DB002 — Destructive storage change, no rollback/backfill note
 
