@@ -102,7 +102,7 @@ When developing this repository itself, `make trial` and `go run ./cmd/specbackf
 
 ## CI Usage
 
-In GitHub Actions, fetch the PR base/head locally and check them as a range diff. For a first rollout, start with `--fail-on off` as advisory output, review the noise level, then switch to `--fail-on warn` when the team trusts it.
+In GitHub Actions, fetch the PR base/head locally and check them as a range diff. Until pilot thresholds pass, run with `--fail-on off` as advisory output.
 
 ```yaml
 name: specbackfill
@@ -120,7 +120,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26.2'
+          go-version-file: go.mod
 
       - name: Install specbackfill
         run: go install github.com/mt4110/specbackfill/cmd/specbackfill@latest
@@ -139,14 +139,13 @@ jobs:
 
 - `fetch-depth: 0`: makes both `--base/--head` commits available locally.
 - `--format text`: best for human-readable CI logs. `--format json` is for CI and downstream processing.
-- `--fail-on warn`: exits `1` for `warn` and `error` findings. `error` fails only on `error`, and `off` never fails because of findings.
+- `--fail-on off`: keeps findings advisory and does not fail CI because of them. `warn` exits `1` for `warn` and `error` findings, and `error` exits `1` only for `error` findings.
 
 ## Local Verification
 
-With mise, install the repository toolchain before running checks. During development, the Makefile provides short commands:
+`make test` runs the pure Go/Python verification path. mise remains optional for local toolchain convenience.
 
 ```bash
-mise install
 make install
 make trial
 make test
@@ -161,6 +160,8 @@ make rule RULE=DB001
 make fixtures
 make pilot-eval
 ```
+
+Use `make test-mise` only when you explicitly want to check the mise task definition too.
 
 `make trial` is a self-check for this repository. To check another project, install the command with `make install`, then run `specbackfill check --fail-on off` from that project's root.
 

@@ -34,10 +34,49 @@ func DiffFile(dir, path string) ([]byte, error) {
 
 func RepoRoot(ctx context.Context, dir string) (string, error) {
 	output, err := gitOutput(ctx, dir, "rev-parse", "--show-toplevel")
-	if err != nil {
+	if err == nil {
+		return strings.TrimSpace(string(output)), nil
+	}
+
+	root, fallbackErr := repoRootFromFileLayout(dir)
+	if fallbackErr != nil {
 		return "", fmt.Errorf("resolve repo root: %w", err)
 	}
-	return strings.TrimSpace(string(output)), nil
+	return root, nil
+}
+
+func repoRootFromFileLayout(dir string) (string, error) {
+	current, err := filepath.Abs(dir)
+	if err != nil {
+		return "", fmt.Errorf("resolve absolute path: %w", err)
+	}
+
+	for {
+		if looksLikeRepoRoot(current) {
+			return current, nil
+		}
+
+		parent := filepath.Dir(current)
+		if parent == current {
+			return "", fmt.Errorf("no specbackfill file-layout root found from %s", dir)
+		}
+		current = parent
+	}
+}
+
+func looksLikeRepoRoot(dir string) bool {
+	required := []string{
+		"go.mod",
+		filepath.Join("cmd", "specbackfill", "main.go"),
+		filepath.Join("testdata", "patches"),
+		filepath.Join("schemas", "obligations.schema.json"),
+	}
+	for _, rel := range required {
+		if _, err := os.Stat(filepath.Join(dir, rel)); err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func hasHead(ctx context.Context, dir string) bool {
