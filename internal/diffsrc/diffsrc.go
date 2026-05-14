@@ -40,7 +40,7 @@ func RepoRoot(ctx context.Context, dir string) (string, error) {
 
 	root, fallbackErr := repoRootFromFileLayout(dir)
 	if fallbackErr != nil {
-		return "", fmt.Errorf("resolve repo root: %w", err)
+		return "", fmt.Errorf("resolve repo root: git rev-parse failed: %w; file-layout fallback failed: %w", err, fallbackErr)
 	}
 	return root, nil
 }

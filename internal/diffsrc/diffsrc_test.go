@@ -173,6 +173,24 @@ func TestRepoRootFallsBackToFileLayoutWithoutGit(t *testing.T) {
 	}
 }
 
+func TestRepoRootReportsGitAndFallbackFailures(t *testing.T) {
+	t.Parallel()
+
+	_, err := RepoRoot(context.Background(), t.TempDir())
+	if err == nil {
+		t.Fatal("RepoRoot() error = nil, want error")
+	}
+	for _, want := range []string{
+		"git rev-parse failed",
+		"file-layout fallback failed",
+		"no specbackfill file-layout root found",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("RepoRoot() error missing %q:\n%v", want, err)
+		}
+	}
+}
+
 func newGitRepo(t *testing.T) string {
 	t.Helper()
 
