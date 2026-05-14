@@ -29,17 +29,23 @@
     "sample_id": {
       "type": "string",
       "minLength": 1,
-      "description": "Stable anonymized row ID for the pilot sample."
+      "maxLength": 80,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$",
+      "description": "Stable anonymized row ID for the pilot sample. Use an opaque public-safe label such as S001."
     },
     "source_label": {
       "type": "string",
       "minLength": 1,
-      "description": "Opaque repository or corpus label. Do not use private repository names unless the scorecard stays local."
+      "maxLength": 80,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$",
+      "description": "Opaque repository or corpus label. Use anonymized labels such as repo-a or corpus-01; do not use private repository names, URLs, paths, or personal identifiers in committed scorecards."
     },
     "sample_ref": {
       "type": "string",
       "minLength": 1,
-      "description": "Opaque PR, diff, or changed-file-group label."
+      "maxLength": 80,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$",
+      "description": "Opaque PR, diff, or changed-file-group label. Use anonymized labels such as diff-001; do not use PR titles, URLs, raw paths, or proprietary identifiers in committed scorecards."
     },
     "rule_id": {
       "type": "string",
@@ -103,10 +109,12 @@
       "$ref": "#/$defs/csv_boolean"
     },
     "duplicate_with_local_ai_review": {
-      "$ref": "#/$defs/csv_boolean"
+      "$ref": "#/$defs/csv_boolean",
+      "description": "True only when local-ai-review independently produced the same actionable concern before consuming specbackfill output."
     },
     "duplicate_with_review_firewall": {
-      "$ref": "#/$defs/csv_boolean"
+      "$ref": "#/$defs/csv_boolean",
+      "description": "True only when a pre-existing review or CI signal already contained the same actionable concern and review-firewall triaged that signal."
     },
     "evidence_ok": {
       "$ref": "#/$defs/csv_boolean",
@@ -119,7 +127,7 @@
     "notes": {
       "type": "string",
       "maxLength": 240,
-      "description": "Short public-safe note. Do not include raw private review text or private diff excerpts."
+      "description": "Short public-safe note. Do not include raw private review text, private diff excerpts, URLs, email-like values, secrets, or proprietary identifiers."
     }
   },
   "$defs": {

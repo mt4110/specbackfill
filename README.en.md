@@ -191,11 +191,13 @@ specbackfill check --diff-file change.diff --emit-local-ai-review-import --fail-
 python3 scripts/evaluate_pilot.py examples/pilot_scorecard.sample.csv --allow-small-sample --local-ai-review-import yes
 ```
 
-The scorecard contract is [schemas/pilot_scorecard.schema.json](./schemas/pilot_scorecard.schema.json), and the synthetic sample is [examples/pilot_scorecard.sample.csv](./examples/pilot_scorecard.sample.csv). The evaluator returns one decision: `continue`, `continue_advisory_only`, or `archive`. `--allow-small-sample` is for sample verification; `archive` decisions only apply after the sample reaches the real-pilot threshold.
+The scorecard contract is [schemas/pilot_scorecard.schema.json](./schemas/pilot_scorecard.schema.json), and the synthetic sample is [examples/pilot_scorecard.sample.csv](./examples/pilot_scorecard.sample.csv). The evaluator returns one decision: `continue`, `continue_advisory_only`, or `archive`. `--allow-small-sample` is only for sample verification; scorecards below 30 rows cannot return `continue`.
 
-`make pilot-eval` uses defaults for checking the synthetic sample. For a real pilot, pass explicit values such as `PILOT_SCORECARD=...` and `PILOT_EVAL_ARGS='--local-ai-review-import yes'`.
+`make pilot-eval` uses defaults for checking the synthetic sample. For a real pilot, pass explicit values such as `PILOT_SCORECARD=...` and `PILOT_EVAL_ARGS='--local-ai-review-import yes'`. Do not use `--allow-small-sample` for a green real-pilot decision; score 30+ real rows instead.
 
-When recording a pilot decision in the public repository, use the fields in [examples/pilot_decision_record.template.md](./examples/pilot_decision_record.template.md) and record only anonymized aggregate values from `scripts/evaluate_pilot.py`. If no real pilot data exists, use `Pilot status: not_run` / `Decision: pending` and do not infer metrics. Do not commit real PR titles, bodies, comments, private review text, raw private diffs, personal data, or proprietary repository names. The synthetic sample is for workflow verification, not as evidence for a pilot decision.
+Use `duplicate_with_local_ai_review` only when local-ai-review independently produced the same concern before consuming specbackfill output. Use `duplicate_with_review_firewall` only when a pre-existing review or CI signal already had the same concern and review-firewall triaged it. Downstream consumption of specbackfill output is not a duplicate.
+
+When recording a pilot decision in the public repository, use the v2 fields in [examples/pilot_decision_record.template.md](./examples/pilot_decision_record.template.md) and record only anonymized aggregate values from `scripts/evaluate_pilot.py`. If no real pilot data exists, use `Pilot status: not_run` / `Decision: pending` and do not infer metrics. Do not commit real PR titles, bodies, comments, private review text, raw private diffs, personal data, or proprietary repository names. The synthetic sample is for workflow verification, not as evidence for a pilot decision.
 
 If no public-safe aggregate exists for the real pilot, do not create an evaluated decision record. Keep the project advisory-only and rely on the template and README workflow until real pilot evidence is available.
 

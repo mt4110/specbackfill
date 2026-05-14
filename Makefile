@@ -89,13 +89,13 @@ trial:
 
 test:
 	@$(GO) test ./...
-	@$(PYTHON) -m unittest scripts/evaluate_pilot_test.py
+	@$(PYTHON) -m unittest discover -s scripts -p '*_test.py'
 	@$(PYTHON) scripts/evaluate_pilot.py examples/pilot_scorecard.sample.csv --allow-small-sample --local-ai-review-import yes >/dev/null
 	@$(PYTHON) scripts/schema_validate_testdata.py --repo-root .
 
 test-mise:
 	@mise run test
-	@$(PYTHON) -m unittest scripts/evaluate_pilot_test.py
+	@$(PYTHON) -m unittest discover -s scripts -p '*_test.py'
 	@$(PYTHON) scripts/evaluate_pilot.py examples/pilot_scorecard.sample.csv --allow-small-sample --local-ai-review-import yes >/dev/null
 	@$(PYTHON) scripts/schema_validate_testdata.py --repo-root .
 

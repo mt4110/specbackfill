@@ -33,6 +33,7 @@ class EvaluatePilotTest(unittest.TestCase):
         self.assertEqual(metrics["useful"], 3)
         self.assertEqual(metrics["false_positive"], 1)
         self.assertEqual(metrics["duplicate_with_review_firewall"], 1)
+        self.assertFalse(metrics["continue_checks"]["sample_size"])
         self.assertFalse(metrics["continue_checks"]["duplicate_with_review_firewall_rate"])
         self.assertTrue(metrics["continue_checks"]["local_ai_review_import_path"])
 
@@ -96,6 +97,114 @@ class EvaluatePilotTest(unittest.TestCase):
         self.assertTrue(metrics["sample_ok"])
         self.assertFalse(metrics["fair_sample"])
         self.assertEqual(metrics["archive_reasons"], [])
+
+    def test_small_sample_override_does_not_allow_continue(self) -> None:
+        decision, metrics = evaluate_pilot.evaluate(
+            [row(operator_verdict="useful_fixed", was_actioned="true")],
+            args(allow_small_sample=True, local_ai_review_import="yes"),
+        )
+
+        self.assertEqual(decision, "continue_advisory_only")
+        self.assertTrue(metrics["sample_ok"])
+        self.assertFalse(metrics["fair_sample"])
+        self.assertFalse(metrics["continue_checks"]["sample_size"])
+
+    def test_fair_sample_can_continue_when_thresholds_pass(self) -> None:
+        rows = [
+            row(
+                sample_id=f"S{index:03}",
+                sample_ref=f"real-diff-{index:03}",
+                obligation_id=f"obl-v1-{index:016x}",
+            )
+            for index in range(30)
+        ]
+        decision, metrics = evaluate_pilot.evaluate(
+            rows,
+            args(allow_small_sample=False, local_ai_review_import="yes"),
+        )
+
+        self.assertEqual(decision, "continue")
+        self.assertTrue(metrics["fair_sample"])
+        self.assertTrue(metrics["continue_checks"]["sample_size"])
+        self.assertEqual(metrics["sample_ref_count"], 30)
+
+    def test_duplicate_verdict_requires_matching_flag(self) -> None:
+        path = write_scorecard([row(operator_verdict="duplicate_with_local_ai_review")])
+        self.addCleanup(path.unlink, missing_ok=True)
+
+        with self.assertRaisesRegex(ValueError, "requires duplicate_with_local_ai_review=true"):
+            evaluate_pilot.read_rows(path)
+
+    def test_duplicate_flag_requires_matching_verdict(self) -> None:
+        path = write_scorecard([row(duplicate_with_review_firewall="true")])
+        self.addCleanup(path.unlink, missing_ok=True)
+
+        with self.assertRaisesRegex(ValueError, "duplicate flags require the matching duplicate operator_verdict"):
+            evaluate_pilot.read_rows(path)
+
+    def test_duplicate_flags_are_mutually_exclusive(self) -> None:
+        path = write_scorecard(
+            [
+                row(
+                    operator_verdict="duplicate_with_local_ai_review",
+                    duplicate_with_local_ai_review="true",
+                    duplicate_with_review_firewall="true",
+                )
+            ]
+        )
+        self.addCleanup(path.unlink, missing_ok=True)
+
+        with self.assertRaisesRegex(ValueError, "cannot both be true"):
+            evaluate_pilot.read_rows(path)
+
+    def test_public_safe_labels_must_be_opaque(self) -> None:
+        path = write_scorecard([row(source_label="org/private-repo")])
+        self.addCleanup(path.unlink, missing_ok=True)
+
+        with self.assertRaisesRegex(ValueError, "opaque public-safe label"):
+            evaluate_pilot.read_rows(path)
+
+    def test_sample_id_must_be_opaque(self) -> None:
+        path = write_scorecard([row(sample_id="https://example.invalid/pr/1")])
+        self.addCleanup(path.unlink, missing_ok=True)
+
+        with self.assertRaisesRegex(ValueError, "opaque public-safe label"):
+            evaluate_pilot.read_rows(path)
+
+    def test_public_safe_notes_reject_email_like_values(self) -> None:
+        path = write_scorecard([row(notes="follow up with person@example.com")])
+        self.addCleanup(path.unlink, missing_ok=True)
+
+        with self.assertRaisesRegex(ValueError, "email-like values"):
+            evaluate_pilot.read_rows(path)
+
+    def test_public_safe_notes_reject_github_token_like_values(self) -> None:
+        path = write_scorecard([row(notes="token ghp_abcdefghijklmnopqrstuvwx")])
+        self.addCleanup(path.unlink, missing_ok=True)
+
+        with self.assertRaisesRegex(ValueError, "token-like values"):
+            evaluate_pilot.read_rows(path)
+
+    def test_public_safe_notes_reject_github_pat_like_values(self) -> None:
+        path = write_scorecard([row(notes="token github_pat_abcdefghijklmnopqrstuvwx")])
+        self.addCleanup(path.unlink, missing_ok=True)
+
+        with self.assertRaisesRegex(ValueError, "token-like values"):
+            evaluate_pilot.read_rows(path)
+
+    def test_public_safe_notes_reject_openai_token_like_values(self) -> None:
+        path = write_scorecard([row(notes="token sk-abcdefghijkl")])
+        self.addCleanup(path.unlink, missing_ok=True)
+
+        with self.assertRaisesRegex(ValueError, "token-like values"):
+            evaluate_pilot.read_rows(path)
+
+    def test_duplicate_sample_ids_are_rejected(self) -> None:
+        path = write_scorecard([row(), row(rule_id="CFG001")])
+        self.addCleanup(path.unlink, missing_ok=True)
+
+        with self.assertRaisesRegex(ValueError, "duplicate sample_id"):
+            evaluate_pilot.read_rows(path)
 
     def test_main_returns_tool_error_for_directory_input(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
