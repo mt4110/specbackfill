@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Validate specbackfill JSON artifacts over all synthetic patch fixtures."""
+"""Validate specbackfill schemas over synthetic patch and pilot fixtures."""
 
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import re
@@ -143,7 +144,7 @@ def validate(instance: Any, schema: dict[str, Any], root: dict[str, Any], path: 
                     errors.extend(validate(instance[key], subschema, root, f"{path}.{key}"))
 
             if schema.get("additionalProperties") is False:
-                extra = sorted(set(instance) - set(properties))
+                extra = sorted(set(instance) - set(properties), key=str)
                 for key in extra:
                     errors.append(f"{path}: additional property {key!r} is not allowed")
 
@@ -248,11 +249,28 @@ def main() -> int:
 
     obligations_schema = json.loads((root / "schemas" / "obligations.schema.json").read_text(encoding="utf-8"))
     import_schema = json.loads((root / "schemas" / "local_ai_review_import.schema.json").read_text(encoding="utf-8"))
-    unsupported = unsupported_schema_keywords(obligations_schema) + unsupported_schema_keywords(import_schema)
+    pilot_schema = json.loads((root / "schemas" / "pilot_scorecard.schema.json").read_text(encoding="utf-8"))
+    unsupported = (
+        unsupported_schema_keywords(obligations_schema)
+        + unsupported_schema_keywords(import_schema)
+        + unsupported_schema_keywords(pilot_schema)
+    )
     if unsupported:
         for error in unsupported:
             print(f"error: {error}", file=sys.stderr)
         return 2
+
+    failures: list[str] = []
+    pilot_scorecard = root / "examples" / "pilot_scorecard.sample.csv"
+    with pilot_scorecard.open(newline="", encoding="utf-8") as handle:
+        pilot_rows = list(csv.DictReader(handle))
+    if not pilot_rows:
+        failures.append(f"{pilot_scorecard.name}: no sample rows")
+    for index, row in enumerate(pilot_rows, start=2):
+        errors = validate(row, pilot_schema, pilot_schema)
+        if errors:
+            failures.append(f"{pilot_scorecard.name}: row {index} schema failed: {errors[0]}")
+            break
 
     with tempfile.TemporaryDirectory() as tmp:
         binary = Path(tmp) / "specbackfill"
@@ -261,7 +279,6 @@ def main() -> int:
             print(build.stderr, file=sys.stderr)
             return 2
 
-        failures: list[str] = []
         for patch in patches:
             obligations = run(
                 [str(binary), "check", "--diff-file", str(patch), "--emit-obligations", "--fail-on", "off"],
@@ -302,6 +319,7 @@ def main() -> int:
 
     print("# schema validation over testdata")
     print(f"patches: {len(patches)}")
+    print(f"pilot_scorecard_rows: {len(pilot_rows)}")
     print(f"failures: {len(failures)}")
     for failure in failures:
         print(f"- {failure}")

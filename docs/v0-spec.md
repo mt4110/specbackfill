@@ -998,7 +998,24 @@ operator-provided integration flags. That decision is an evaluation result, not
 a change to `specbackfill check` exit semantics.
 
 Small synthetic samples MAY opt into sample-size override for smoke testing,
-but archive decisions SHOULD require the real-pilot minimum sample size.
+but `continue` and archive decisions SHOULD require the real-pilot minimum
+sample size. A small sample MAY verify parsing, scoring, and report shape, but
+MUST NOT be used as green product evidence.
+
+Duplicate scorecard labels MUST mean independent prior signals. A
+`duplicate_with_local_ai_review` row means `local-ai-review` independently
+produced the same actionable concern before consuming `specbackfill` output. A
+`duplicate_with_review_firewall` row means a pre-existing review or CI signal
+already contained the same actionable concern and `review-firewall` triaged
+that signal. Downstream storage, summary, routing, or display of
+`specbackfill` output MUST NOT by itself count as a duplicate. The duplicate
+boolean fields SHOULD match the duplicate operator verdict so scorecards cannot
+accidentally double-count downstream consumption as independent coverage.
+
+Public-safe scorecard labels SHOULD be opaque labels, not repository names,
+URLs, personal identifiers, raw paths, PR titles, or review text. Public-safe
+notes SHOULD remain short aggregate-safe notes and SHOULD NOT include URLs,
+email-like values, token-like values, secrets, or raw diff excerpts.
 
 Any pilot scorecard committed to the public repository MUST be public-safe. It
 MUST NOT include raw private diffs, private PR titles, private PR bodies,
@@ -1014,7 +1031,7 @@ companion rules, or stricter default CI failure behavior.
 ### 11.2 Pilot decision record
 
 v0 MAY include a public-safe pilot decision record template for summarizing the
-result of Phase 4 pilot evaluation. The public template lives at
+result of real pilot evaluation. The public template lives at
 `examples/pilot_decision_record.template.md`.
 
 A pilot decision record SHOULD be derived from `scripts/evaluate_pilot.py`

@@ -3,6 +3,7 @@
 
 The script scores human-labeled deterministic companion obligations. It does
 not read raw diffs, PR bodies, private review text, or review-history stores.
+Rows should use opaque labels and short public-safe notes.
 """
 
 from __future__ import annotations
@@ -17,6 +18,27 @@ from pathlib import Path
 
 SCHEMA_VERSION = "pilot_scorecard.v1"
 STABLE_OBLIGATION_ID_RE = re.compile(r"^obl-v1-[0-9a-f]{16}$")
+OPAQUE_LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
+PUBLIC_SAFETY_PATTERNS = [
+    (
+        re.compile(r"https?://", re.IGNORECASE),
+        "URLs are not allowed in public-safe scorecard notes",
+    ),
+    (
+        re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"),
+        "email-like values are not allowed in public-safe scorecard notes",
+    ),
+    (
+        re.compile(
+            r"\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_=-]{8,})"
+        ),
+        "token-like values are not allowed in public-safe scorecard notes",
+    ),
+    (
+        re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
+        "private-key material is not allowed in public-safe scorecard notes",
+    ),
+]
 
 REQUIRED_COLUMNS = [
     "schema_version",
@@ -90,7 +112,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--allow-small-sample",
         action="store_true",
-        help="allow samples below --min-sample-size for smoke tests and dry runs; archive checks still require a fair sample",
+        help="allow samples below --min-sample-size for smoke tests and dry runs; continue/archive decisions still require a fair sample",
     )
     parser.add_argument(
         "--min-sample-size",
@@ -160,6 +182,11 @@ def read_rows(path: Path) -> list[dict[str, str]]:
 
     for index, row in enumerate(rows, start=2):
         validate_row(row, index)
+
+    sample_id_counts = Counter((row.get("sample_id") or "").strip() for row in rows)
+    duplicate_sample_ids = sorted(sample_id for sample_id, count in sample_id_counts.items() if count > 1)
+    if duplicate_sample_ids:
+        raise ValueError(f"CSV has duplicate sample_id values: {', '.join(duplicate_sample_ids)}")
     return rows
 
 
@@ -174,6 +201,13 @@ def validate_row(row: dict[str, str], row_number: int) -> None:
     for field in ["sample_id", "source_label", "sample_ref", "rule_id", "obligation_id"]:
         if not (row.get(field) or "").strip():
             raise ValueError(f"row {row_number}: {field} is required")
+    for field in ["sample_id", "source_label", "sample_ref"]:
+        value = (row.get(field) or "").strip()
+        if not OPAQUE_LABEL_RE.fullmatch(value):
+            raise ValueError(
+                f"row {row_number}: {field} must be an opaque public-safe label "
+                "using only letters, numbers, '.', '_' or '-'"
+            )
     if (row.get("status") or "").strip() not in STATUSES:
         raise ValueError(f"row {row_number}: invalid status {row.get('status')!r}")
     if (row.get("severity") or "").strip() not in SEVERITIES:
@@ -188,10 +222,35 @@ def validate_row(row: dict[str, str], row_number: int) -> None:
         raise ValueError(f"row {row_number}: false_positive rows require fp_reason")
     if verdict != FALSE_POSITIVE and fp_reason != "":
         raise ValueError(f"row {row_number}: fp_reason should be blank unless verdict is false_positive")
-    for field in BOOL_FIELDS:
-        parse_bool(row.get(field, ""), field=field, row_number=row_number)
+    bools = {
+        field: parse_bool(row.get(field, ""), field=field, row_number=row_number)
+        for field in BOOL_FIELDS
+    }
+    if bools["duplicate_with_local_ai_review"] and bools["duplicate_with_review_firewall"]:
+        raise ValueError(
+            f"row {row_number}: duplicate_with_local_ai_review and duplicate_with_review_firewall cannot both be true"
+        )
+    if verdict == DUPLICATE_LOCAL_AI_REVIEW and not bools["duplicate_with_local_ai_review"]:
+        raise ValueError(
+            f"row {row_number}: duplicate_with_local_ai_review verdict requires duplicate_with_local_ai_review=true"
+        )
+    if verdict == DUPLICATE_REVIEW_FIREWALL and not bools["duplicate_with_review_firewall"]:
+        raise ValueError(
+            f"row {row_number}: duplicate_with_review_firewall verdict requires duplicate_with_review_firewall=true"
+        )
+    if verdict not in {DUPLICATE_LOCAL_AI_REVIEW, DUPLICATE_REVIEW_FIREWALL} and (
+        bools["duplicate_with_local_ai_review"] or bools["duplicate_with_review_firewall"]
+    ):
+        raise ValueError(f"row {row_number}: duplicate flags require the matching duplicate operator_verdict")
     if len(row.get("notes") or "") > 240:
         raise ValueError(f"row {row_number}: notes must be 240 characters or fewer")
+    validate_public_safe_notes(row.get("notes") or "", row_number)
+
+
+def validate_public_safe_notes(notes: str, row_number: int) -> None:
+    for pattern, message in PUBLIC_SAFETY_PATTERNS:
+        if pattern.search(notes):
+            raise ValueError(f"row {row_number}: {message}")
 
 
 def bool_value(row: dict[str, str], field: str) -> bool:
@@ -257,8 +316,11 @@ def evaluate(rows: list[dict[str, str]], args: argparse.Namespace) -> tuple[str,
     sample_ok = fair_sample or args.allow_small_sample
     local_ai_review_import_ok = args.local_ai_review_import == "yes"
 
+    source_labels = {(row.get("source_label") or "").strip() for row in rows}
+    sample_refs = {(row.get("sample_ref") or "").strip() for row in rows}
+
     continue_checks = {
-        "sample_size": sample_ok,
+        "sample_size": fair_sample,
         "useful_obligations": useful >= 5 or useful_rate >= 0.20,
         "false_positive_rate": false_positive_rate <= 0.25,
         "hard_blocker_false_positive_rate": hard_blocker_false_positive_rate <= 0.10,
@@ -296,6 +358,8 @@ def evaluate(rows: list[dict[str, str]], args: argparse.Namespace) -> tuple[str,
         "total": total,
         "sample_ok": sample_ok,
         "fair_sample": fair_sample,
+        "source_label_count": len(source_labels),
+        "sample_ref_count": len(sample_refs),
         "local_ai_review_import": args.local_ai_review_import,
         "useful": useful,
         "useful_rate": useful_rate,
@@ -331,6 +395,8 @@ def print_report(decision: str, metrics: dict[str, object]) -> None:
     print(f"rows: {metrics['total']}")
     print(f"sample_ok: {str(metrics['sample_ok']).lower()}")
     print(f"fair_sample: {str(metrics['fair_sample']).lower()}")
+    print(f"source_labels: {metrics['source_label_count']}")
+    print(f"sample_refs: {metrics['sample_ref_count']}")
     print(f"local_ai_review_import: {metrics['local_ai_review_import']}")
     print()
     print("## metrics")

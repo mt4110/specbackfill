@@ -46,6 +46,8 @@ mkdir -p "$copy"
 	--exclude .private_docs \
 	--exclude .codex \
 	--exclude '.codex-*' \
+	--exclude '__pycache__' \
+	--exclude '*.pyc' \
 	--exclude docs/prompt \
 	-cf "$archive" .)
 (cd "$copy" && tar -xf "$archive")
@@ -56,5 +58,5 @@ echo '# source archive smoke'
 echo "copy: $copy"
 
 "$go_cmd" test ./...
-python3 -m unittest scripts/evaluate_pilot_test.py
+python3 -m unittest discover -s scripts -p '*_test.py'
 SPECBACKFILL_GO="$go_cmd" python3 scripts/schema_validate_testdata.py --repo-root .

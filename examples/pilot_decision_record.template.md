@@ -1,112 +1,131 @@
-# Pilot Decision Record
+# specbackfill Pilot Decision Record v2
 
-This template is for a public-safe Phase 4 pilot decision after evaluating
+This template is for a public-safe Week 3 real pilot decision after evaluating
 `pilot_scorecard.v1` rows. Keep real pilot scorecards, raw private diffs,
 private PR titles, descriptions, bodies, comments, private review text,
 personal data, secrets, and proprietary repository names out of the public
 repository.
 
-## Summary
-
-| Field | Value |
-|---|---|
-| Date | YYYY-MM-DD |
-| Pilot status | not_run \| evaluated |
-| Decision | pending \| continue \| continue_advisory_only \| archive |
-| Scorecard source | none \| local/private aggregate \| public-safe aggregate |
-| Evaluator command | not_run \| `python3 scripts/evaluate_pilot.py ...` |
-
 If no real pilot data exists, set `Pilot status` to `not_run`, set `Decision`
-to `pending`, and leave the metrics below as `TBD`. Do not infer or invent
-numbers from synthetic samples. The synthetic sample is only for workflow
-verification, not for a product decision.
-
-If this record will be committed, use `public-safe aggregate` or `none` for
-`Scorecard source`. Keep `local/private aggregate` only in uncommitted local
-records.
+to `pending`, and leave metrics as `TBD`. Do not infer or invent numbers from
+synthetic samples.
 
 ## Commit Gate
 
-- [ ] A real pilot was evaluated into a public-safe aggregate, or the record
+- [ ] A real pilot was evaluated into a public-safe aggregate, or this record
       stays `Pilot status: not_run` / `Decision: pending`.
 - [ ] Evaluated metrics are copied from `scripts/evaluate_pilot.py` output, not
       inferred from intuition or synthetic samples.
-- [ ] If no public-safe aggregate exists, do not commit a filled evaluated
-      decision record.
+- [ ] The committed record contains only aggregate values and anonymous labels.
+- [ ] The real pilot scorecard itself is not committed.
 
-## Public Safety
+## Pilot Status
 
-- [ ] Contains only anonymous labels and aggregate metrics.
-- [ ] Contains no raw private diffs.
-- [ ] Contains no private PR titles, descriptions, bodies, or comments.
-- [ ] Contains no private review text.
-- [ ] Contains no personal data, secrets, or proprietary repository names.
-- [ ] Does not commit the real pilot scorecard.
-- [ ] Commits only this public-safe aggregate decision record, if a record is committed.
+- [ ] not_run
+- [ ] running
+- [ ] complete
+
+| Field | Value |
+| --- | --- |
+| Date | YYYY-MM-DD |
+| Pilot window | TBD |
+| Data sensitivity | public-safe aggregate only |
+| Decision | pending / continue / continue_advisory_only / archive |
+| Evaluator command | `python3 scripts/evaluate_pilot.py ...` |
 
 ## Sample
 
-| Metric | Value |
-|---|---:|
-| Scorecard rows | TBD |
-| Fair sample | yes/no/TBD |
-| Number of diffs | TBD |
-| Number of PRs | TBD |
-| Changed-file groups | TBD |
-| Contract-change classes covered | TBD |
+| Field | Value |
+| --- | ---: |
+| scorecard rows | TBD |
+| fair sample | yes/no/TBD |
+| sample refs | TBD |
+| repositories/corpora | TBD |
+| local-ai-review import exercised | yes/no/TBD |
+| suppression iterations | TBD |
 
-## Evaluation Metrics
+## Metrics
 
-| Metric | Value |
-|---|---:|
-| Useful obligations | TBD |
-| Useful rate | TBD |
-| Actioned obligations | TBD |
-| Actioned rate | TBD |
-| False positives | TBD |
-| False-positive rate | TBD |
-| Hard-blocker false positives | TBD |
-| Hard-blocker false-positive rate | TBD |
-| Duplicate with local-ai-review rate | TBD |
-| Duplicate with review-firewall rate | TBD |
-| Evidence coverage | TBD |
-| Stable deterministic ID coverage | TBD |
-| Status-reason coverage | TBD |
-| local-ai-review import path exercised | yes/no/TBD |
+| Metric | Value | Threshold |
+| --- | ---: | ---: |
+| useful count | TBD | >= 5 |
+| useful rate | TBD | >= 20% |
+| actioned count | TBD | informational / >= 10 for beta |
+| actioned rate | TBD | informational |
+| false positive count | TBD | informational |
+| false positive rate | TBD | <= 25% |
+| hard blocker false positive count | TBD | informational |
+| hard blocker false positive rate | TBD | <= 10% |
+| duplicate with local-ai-review | TBD | <= 25% unless unique value proven |
+| duplicate with review-firewall | TBD | <= 10% |
+| evidence coverage | TBD | >= 95% |
+| stable deterministic IDs | TBD | 100% |
+| status reason coverage | TBD | >= 90% |
 
-## Rule And Reason Summary
+## Threshold Checks
 
-Top useful rules:
+- [ ] sample_size
+- [ ] useful_obligations
+- [ ] false_positive_rate
+- [ ] hard_blocker_false_positive_rate
+- [ ] duplicate_with_local_ai_review_rate
+- [ ] duplicate_with_review_firewall_rate
+- [ ] evidence_coverage
+- [ ] stable_deterministic_ids
+- [ ] status_reason_coverage
+- [ ] local_ai_review_import_path
 
-1. TBD
-2. TBD
-3. TBD
+## False-Positive Buckets
 
-Top false-positive reasons:
+| Bucket | Count | Fix planned |
+| --- | ---: | --- |
+| ambiguous_anchor | TBD | TBD |
+| companion_present_not_recognized | TBD | TBD |
+| docs_only | TBD | TBD |
+| example_only | TBD | TBD |
+| generated_only | TBD | TBD |
+| migration_only | TBD | TBD |
+| not_diff_local | TBD | TBD |
+| sample_only | TBD | TBD |
+| severity_too_high | TBD | TBD |
+| tests_only | TBD | TBD |
+| unrelated_companion | TBD | TBD |
+| other | TBD | TBD |
 
-1. TBD
-2. TBD
-3. TBD
+## Duplicate Interpretation
 
-## Boundary Review
+Confirm duplicates were independent prior signals, not downstream consumption
+of `specbackfill` output.
 
-- [ ] `specbackfill` remained a deterministic change-contract compiler for
-      diff-local companion obligations.
-- [ ] The pilot did not add AI/LLM detection to `specbackfill`.
-- [ ] The pilot did not add PR comment posting to `specbackfill`.
-- [ ] `local-ai-review` remained the probabilistic review and history owner.
-- [ ] `review-firewall` remained the review-comment triage/routing owner.
-- [ ] No Phase 5 rule graduation or new rule work is included in this record.
+- [ ] local-ai-review duplicate definition checked
+- [ ] review-firewall duplicate definition checked
 
-## Decision Rationale
+## Decision
+
+- [ ] pending
+- [ ] continue
+- [ ] continue_advisory_only
+- [ ] archive
+
+## Rationale
 
 ```text
 TBD
 ```
 
-## Next Action
+## Follow-Up
 
 - [ ] Keep advisory-only and collect a real pilot sample.
 - [ ] Continue to the next approved phase.
 - [ ] Continue advisory-only with suppression/evidence hardening.
-- [ ] Archive.
+- [ ] Archive or freeze.
+
+## Privacy Check
+
+- [ ] no raw private diffs
+- [ ] no PR title/body/comment text
+- [ ] no private review text
+- [ ] no personal data
+- [ ] no secrets
+- [ ] no proprietary repo names
+- [ ] no real pilot scorecard committed
