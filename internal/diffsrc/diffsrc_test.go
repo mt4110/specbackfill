@@ -146,6 +146,51 @@ func TestRepoRootFromNestedDirectory(t *testing.T) {
 	}
 }
 
+func TestRepoRootFallsBackToFileLayoutWithoutGit(t *testing.T) {
+	t.Parallel()
+
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, "go.mod"), "module github.com/mt4110/specbackfill\n")
+	if err := os.MkdirAll(filepath.Join(repo, "cmd", "specbackfill"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(cmd/specbackfill) error = %v", err)
+	}
+	writeFile(t, filepath.Join(repo, "cmd", "specbackfill", "main.go"), "package main\n")
+	if err := os.MkdirAll(filepath.Join(repo, "schemas"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(schemas) error = %v", err)
+	}
+	writeFile(t, filepath.Join(repo, "schemas", "obligations.schema.json"), "{}\n")
+	if err := os.MkdirAll(filepath.Join(repo, "testdata", "patches"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(testdata/patches) error = %v", err)
+	}
+	nested := filepath.Join(repo, "cmd", "specbackfill")
+
+	root, err := RepoRoot(context.Background(), nested)
+	if err != nil {
+		t.Fatalf("RepoRoot() error = %v", err)
+	}
+	if root != repo {
+		t.Fatalf("RepoRoot() = %q, want %q", root, repo)
+	}
+}
+
+func TestRepoRootReportsGitAndFallbackFailures(t *testing.T) {
+	t.Parallel()
+
+	_, err := RepoRoot(context.Background(), t.TempDir())
+	if err == nil {
+		t.Fatal("RepoRoot() error = nil, want error")
+	}
+	for _, want := range []string{
+		"git rev-parse failed",
+		"file-layout fallback failed",
+		"no specbackfill file-layout root found",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("RepoRoot() error missing %q:\n%v", want, err)
+		}
+	}
+}
+
 func newGitRepo(t *testing.T) string {
 	t.Helper()
 

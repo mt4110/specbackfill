@@ -102,7 +102,7 @@ specbackfill check --fail-on off
 
 ## CI での利用
 
-GitHub Actions では、PR の base/head をローカルに取得してから range diff として点検します。導入直後は `--fail-on off` で advisory output として流し、ノイズ感を確認してから `--fail-on warn` に上げるのがおすすめです。
+GitHub Actions では、PR の base/head をローカルに取得してから range diff として点検します。pilot thresholds が通るまでは `--fail-on off` で advisory output として流します。
 
 ```yaml
 name: specbackfill
@@ -120,7 +120,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26.2'
+          go-version-file: go.mod
 
       - name: Install specbackfill
         run: go install github.com/mt4110/specbackfill/cmd/specbackfill@latest
@@ -139,14 +139,13 @@ jobs:
 
 - `fetch-depth: 0`: `--base/--head` の両方をローカルで参照できるようにします。
 - `--format text`: CI log で人が読む用途に向きます。`--format json` は CI や downstream processing 向けです。
-- `--fail-on warn`: `warn` と `error` で exit code `1` にします。`error` は `error` のみ、`off` は finding では失敗しません。
+- `--fail-on off`: finding では CI を失敗させず、advisory output として確認できます。`warn` は `warn` と `error` で exit code `1`、`error` は `error` のみで exit code `1` にします。
 
 ## ローカル確認
 
-mise を使う場合は、この repository の Go toolchain を揃えてから確認できます。開発中は Makefile の短いコマンドを使えます。
+`make test` は pure Go/Python の検証として動きます。mise を使う場合は任意で toolchain を揃えられます。
 
 ```bash
-mise install
 make install
 make trial
 make test
@@ -161,6 +160,8 @@ make rule RULE=DB001
 make fixtures
 make pilot-eval
 ```
+
+mise の task 定義も確認したい場合だけ、追加で `make test-mise` を使えます。
 
 `make trial` はこの repository の self-check です。他の project を点検する場合は、まず `make install` で `specbackfill` コマンドを入れてから、対象 project の root で `specbackfill check --fail-on off` を実行します。
 

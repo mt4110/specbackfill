@@ -1,6 +1,19 @@
 SHELL := /bin/sh
 
-SPECBACKFILL := mise exec -- go run ./cmd/specbackfill
+# Default test path is the plain go test ./... command when Go is on PATH.
+# mise is only a local fallback for checkouts that have the toolchain installed there.
+GO ?= $(shell \
+	if command -v go >/dev/null 2>&1; then \
+		goroot=$$(go env GOROOT 2>/dev/null || true); \
+		if [ -n "$$goroot" ] && [ -x "$$goroot/bin/go" ]; then printf '%s/bin/go' "$$goroot"; else command -v go; fi; \
+	elif command -v mise >/dev/null 2>&1; then \
+		goroot=$$(mise exec -- go env GOROOT 2>/dev/null || true); \
+		if [ -n "$$goroot" ] && [ -x "$$goroot/bin/go" ]; then printf '%s/bin/go' "$$goroot"; else printf go; fi; \
+	else \
+		printf go; \
+	fi)
+PYTHON ?= python3
+SPECBACKFILL := $(GO) run ./cmd/specbackfill
 PREFIX ?= $(HOME)/.local
 BINDIR ?= $(PREFIX)/bin
 BASE ?= main
@@ -13,7 +26,7 @@ PILOT_EVAL_ARGS ?= --allow-small-sample --local-ai-review-import yes
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install trial test check pr patch summary json md rules rule fixtures pilot-eval
+.PHONY: help install trial test test-mise check pr patch summary json md rules rule fixtures pilot-eval
 
 help:
 	@printf '%s\n' \
@@ -30,11 +43,12 @@ help:
 		'  make rule [RULE=DB001]      Show one rule' \
 		'  make fixtures               Show fixture coverage' \
 		'  make pilot-eval [PILOT_SCORECARD=... PILOT_EVAL_ARGS=...]  Evaluate a pilot scorecard CSV' \
-		'  make test                   Run tests'
+		'  make test                   Run pure Go/Python tests' \
+		'  make test-mise              Run mise test, then Python/schema checks'
 
 install:
 	@mkdir -p "$(BINDIR)"
-	@mise exec -- go build -o "$(BINDIR)/specbackfill" ./cmd/specbackfill
+	@$(GO) build -o "$(BINDIR)/specbackfill" ./cmd/specbackfill
 	@printf 'Installed: %s/specbackfill\n' "$(BINDIR)"
 	@case ":$$PATH:" in \
 		*:"$(BINDIR)":*) printf 'OK: %s is on PATH.\n' "$(BINDIR)" ;; \
@@ -46,7 +60,7 @@ trial:
 	@printf '\nThis is a self-check for the specbackfill repository.\n'
 	@printf 'To check another project, run: make install, then cd there and run specbackfill check --fail-on off.\n'
 	@printf '\n== 1/4 tests ==\n'
-	@mise run test
+	@$(MAKE) --no-print-directory test
 	@printf '\n== 2/4 advisory diff check ==\n'
 	@$(SPECBACKFILL) check --fail-on off
 	@printf '\nReading this:\n'
@@ -74,9 +88,16 @@ trial:
 	@printf '  specbackfill check --fail-on off\n'
 
 test:
+	@$(GO) test ./...
+	@$(PYTHON) -m unittest scripts/evaluate_pilot_test.py
+	@$(PYTHON) scripts/evaluate_pilot.py examples/pilot_scorecard.sample.csv --allow-small-sample --local-ai-review-import yes >/dev/null
+	@$(PYTHON) scripts/schema_validate_testdata.py --repo-root .
+
+test-mise:
 	@mise run test
-	@python3 -m unittest scripts/evaluate_pilot_test.py
-	@python3 scripts/evaluate_pilot.py examples/pilot_scorecard.sample.csv --allow-small-sample --local-ai-review-import yes >/dev/null
+	@$(PYTHON) -m unittest scripts/evaluate_pilot_test.py
+	@$(PYTHON) scripts/evaluate_pilot.py examples/pilot_scorecard.sample.csv --allow-small-sample --local-ai-review-import yes >/dev/null
+	@$(PYTHON) scripts/schema_validate_testdata.py --repo-root .
 
 check:
 	@$(SPECBACKFILL) check --fail-on off
