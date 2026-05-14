@@ -31,8 +31,6 @@ var defaultRuleCatalog = []RuleInfo{
 		},
 		ExpectedCompanions: []string{
 			"migration file",
-			"migration test",
-			"rollback/backfill note",
 		},
 		DoesNotReportOn: []string{
 			"migration-only diffs with matching companion evidence",

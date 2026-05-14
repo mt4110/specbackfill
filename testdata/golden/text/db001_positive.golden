@@ -12,5 +12,3 @@ findings: error=1 warn=0 info=0
     - schema.prisma:+ email String @unique
   expected companions:
     - migration file
-    - migration test
-    - rollback/backfill note

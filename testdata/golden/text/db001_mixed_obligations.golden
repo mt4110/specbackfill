@@ -1,15 +1,16 @@
 specbackfill check
 input: diff file
 note: only the provided unified diff file was evaluated
-changed files: 1
+changed files: 2
 changed file summary:
   - db schema: 1
     - schema.prisma
+  - migrations: 1
+    - prisma/migrations/20260329030303_add_user_email/migration.sql
 findings: error=1 warn=0 info=0
 [error] DB001 Schema changed, but no matching migration companion moved with this diff
   why: Schema-affecting lines moved in the diff, but no matching migration companion evidence moved with them.
   evidence:
-    - schema.prisma:+ email String @unique
+    - schema.prisma:+ slug String
   expected companions:
     - migration file
-  explanation: This explains the existing DB001 finding: Schema changed, but no matching migration companion moved with this diff. The explanation is grounded in diff-local evidence: schema.prisma:3:+ email String @unique. Expected companion categories remain: migration file. It does not claim repository-wide absence.

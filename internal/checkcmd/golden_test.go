@@ -28,6 +28,7 @@ func TestGoldenOutputs(t *testing.T) {
 		{name: "ops001_positive", fixture: "ops001_positive.diff"},
 		{name: "doc001_positive", fixture: "doc001_positive.diff"},
 		{name: "db001_companion", fixture: "db001_companion.diff"},
+		{name: "db001_mixed_obligations", fixture: "db001_mixed_obligations.diff"},
 		{name: "db001_db002_positive", fixture: "db001_db002_positive.diff"},
 		{name: "api001_err001_positive", fixture: "api001_err001_positive.diff"},
 		{name: "db001_migration_only", fixture: "db001_migration_only.diff"},
@@ -97,6 +98,7 @@ func TestGoldenObligationOutputs(t *testing.T) {
 	}{
 		{name: "db001_positive", fixture: "db001_positive.diff"},
 		{name: "db001_companion", fixture: "db001_companion.diff"},
+		{name: "db001_mixed_obligations", fixture: "db001_mixed_obligations.diff"},
 		{name: "db001_migration_only", fixture: "db001_migration_only.diff"},
 	}
 
@@ -128,6 +130,7 @@ func TestGoldenLocalAIReviewImportOutputs(t *testing.T) {
 	}{
 		{name: "db001_positive", fixture: "db001_positive.diff"},
 		{name: "db001_companion", fixture: "db001_companion.diff"},
+		{name: "db001_mixed_obligations", fixture: "db001_mixed_obligations.diff"},
 		{name: "db001_migration_only", fixture: "db001_migration_only.diff"},
 	}
 

@@ -190,6 +190,52 @@ func TestRunEmitObligationsJSON(t *testing.T) {
 	}
 }
 
+func TestRunEmitObligationsMixedDB001StatusAndIDStability(t *testing.T) {
+	t.Parallel()
+
+	fixture := writeFixtureCopy(t, "db001_mixed_obligations.diff")
+	args := []string{"--diff-file", fixture, "--emit-obligations", "--fail-on", "off"}
+	first, firstCode, firstStderr := runCheckObligations(t, t.TempDir(), args)
+	second, secondCode, secondStderr := runCheckObligations(t, t.TempDir(), args)
+	if firstCode != 0 || secondCode != 0 {
+		t.Fatalf("Run() codes first=%d second=%d; stderr first=%q second=%q", firstCode, secondCode, firstStderr, secondStderr)
+	}
+	if firstStderr != "" || secondStderr != "" {
+		t.Fatalf("unexpected stderr first=%q second=%q", firstStderr, secondStderr)
+	}
+	if len(first.Obligations) != 2 || len(second.Obligations) != 2 {
+		t.Fatalf("obligation counts first=%d second=%d, want 2", len(first.Obligations), len(second.Obligations))
+	}
+
+	firstByExcerpt := obligationsByAnchorExcerpt(first.Obligations)
+	secondByExcerpt := obligationsByAnchorExcerpt(second.Obligations)
+	for _, excerpt := range []string{"email String", "slug String"} {
+		firstObligation, ok := firstByExcerpt[excerpt]
+		if !ok {
+			t.Fatalf("first artifact missing obligation for %q: %+v", excerpt, first.Obligations)
+		}
+		secondObligation, ok := secondByExcerpt[excerpt]
+		if !ok {
+			t.Fatalf("second artifact missing obligation for %q: %+v", excerpt, second.Obligations)
+		}
+		if firstObligation.ObligationID == "" || firstObligation.ObligationID != secondObligation.ObligationID {
+			t.Fatalf("%q obligation ID unstable: first=%q second=%q", excerpt, firstObligation.ObligationID, secondObligation.ObligationID)
+		}
+		if firstObligation.Status != secondObligation.Status {
+			t.Fatalf("%q status unstable: first=%s second=%s", excerpt, firstObligation.Status, secondObligation.Status)
+		}
+	}
+	if firstByExcerpt["email String"].Status != model.ObligationStatusSatisfied {
+		t.Fatalf("email status = %s, want satisfied", firstByExcerpt["email String"].Status)
+	}
+	if firstByExcerpt["slug String"].Status != model.ObligationStatusMissing {
+		t.Fatalf("slug status = %s, want missing", firstByExcerpt["slug String"].Status)
+	}
+	if firstByExcerpt["email String"].FindingID != nil || firstByExcerpt["slug String"].FindingID == nil {
+		t.Fatalf("finding metadata does not match statuses: email=%+v slug=%+v", firstByExcerpt["email String"], firstByExcerpt["slug String"])
+	}
+}
+
 func TestRunEmitLocalAIReviewImportJSONL(t *testing.T) {
 	t.Parallel()
 
@@ -226,6 +272,17 @@ func TestRunEmitLocalAIReviewImportJSONL(t *testing.T) {
 	if !item.DiffLocalClaim || len(item.Evidence) == 0 || len(item.RequiredCompanions) == 0 {
 		t.Fatalf("item lost importable evidence/status details: %+v", item)
 	}
+}
+
+func obligationsByAnchorExcerpt(obligations []model.Obligation) map[string]model.Obligation {
+	byExcerpt := make(map[string]model.Obligation, len(obligations))
+	for _, obligation := range obligations {
+		if len(obligation.Anchor.Evidence) == 0 {
+			continue
+		}
+		byExcerpt[obligation.Anchor.Evidence[0].Excerpt] = obligation
+	}
+	return byExcerpt
 }
 
 func TestRunEmitLocalAIReviewImportCannotCombineWithOtherOutputModes(t *testing.T) {

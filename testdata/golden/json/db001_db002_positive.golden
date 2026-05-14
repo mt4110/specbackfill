@@ -15,7 +15,7 @@
   },
   "findings": [
     {
-      "finding_id": "v0-82e2676f0c6030e7",
+      "finding_id": "v0-c81e374cf584324b",
       "omission_signature": "db001.schema_changed.migration_companion",
       "rule_id": "DB001",
       "severity": "error",
@@ -31,9 +31,7 @@
         }
       ],
       "expected_companions": [
-        "migration file",
-        "migration test",
-        "rollback/backfill note"
+        "migration file"
       ]
     },
     {

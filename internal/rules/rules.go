@@ -9,6 +9,7 @@ import (
 )
 
 var prismaFieldRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*\s+[A-Za-z_][A-Za-z0-9_\[\]?]*`)
+var prismaModelRE = regexp.MustCompile(`^\s*model\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{`)
 var termTokenRE = regexp.MustCompile(`[A-Za-z0-9_./-]+`)
 var alnumTokenRE = regexp.MustCompile(`[a-z0-9]+`)
 var httpStatusRE = regexp.MustCompile(`\bhttp\.Status[A-Z][A-Za-z0-9_]+\b`)
@@ -28,9 +29,7 @@ func Evaluate(diff model.Diff, repoProfile model.RepoProfile) []model.Finding {
 func EvaluateObligations(diff model.Diff, _ model.RepoProfile) []model.Obligation {
 	obligations := make([]model.Obligation, 0, 8)
 
-	if obligation, ok := evaluateDB001(diff); ok {
-		obligations = append(obligations, obligation)
-	}
+	obligations = append(obligations, evaluateDB001(diff)...)
 	if obligation, ok := evaluateDB002(diff); ok {
 		obligations = append(obligations, obligation)
 	}
@@ -93,6 +92,12 @@ type obligationSpec struct {
 type companionMatch struct {
 	path     string
 	evidence []model.Evidence
+}
+
+type db001Anchor struct {
+	evidence        []model.Evidence
+	searchTerms     []string
+	requireAllTerms bool
 }
 
 type obligationResolution struct {
@@ -223,7 +228,7 @@ func obligationStatusFromSatisfiers(satisfiers []string) model.ObligationStatus 
 	return model.ObligationStatusMissing
 }
 
-func evaluateDB001(diff model.Diff) (model.Obligation, bool) {
+func evaluateDB001(diff model.Diff) []model.Obligation {
 	spec := obligationSpec{
 		ruleID:               "DB001",
 		severity:             model.SeverityError,
@@ -242,28 +247,36 @@ func evaluateDB001(diff model.Diff) (model.Obligation, bool) {
 		},
 		expectedCompanions: []string{
 			"migration file",
-			"migration test",
-			"rollback/backfill note",
 		},
 	}
-	evidence := collectEvidence(diff, 3, func(file model.File, line model.Line) bool {
-		return isDB001SchemaPath(file.Path) && isChangedLine(line) && matchesDB001Line(file.Path, line.Text)
-	})
-	if len(evidence) == 0 {
+	anchors := collectDB001Anchors(diff)
+	if len(anchors) == 0 {
 		if hasAnchorEvidence(diff, func(file model.File, line model.Line) bool {
 			return isDB002TriggerPath(file.Path) && isChangedLine(line) && matchesDB002Line(line.Text)
 		}) {
-			return model.Obligation{}, false
+			return nil
 		}
 		if reason, suppressedEvidence, ok := collectSuppressedCandidateEvidence(diff, 3, []model.SuppressionReason{model.SuppressionReasonMigrationOnly}, func(file model.File, line model.Line) bool {
 			return isChangedLine(line) && matchesDB001Line(file.Path, line.Text)
 		}); ok {
-			return buildSuppressedObligation(spec, suppressedEvidence, reason), true
+			return []model.Obligation{buildSuppressedObligation(spec, suppressedEvidence, reason)}
 		}
-		return model.Obligation{}, false
+		return nil
 	}
-	matches := collectPositiveCompanionMatches(diff, isMigrationPath, extractSearchTerms(evidence), companionTermsMatch)
-	return buildResolvedObligation(spec, evidence, matches), true
+
+	obligations := make([]model.Obligation, 0, len(anchors))
+	for _, anchor := range anchors {
+		anchorEvidence := anchor.evidence
+		searchTerms := anchor.searchTerms
+		if len(searchTerms) == 0 && hasDB001MigrationCompanionChange(diff) {
+			continue
+		}
+		matches := collectPositiveCompanionMatches(diff, isMigrationPath, searchTerms, func(file model.File, line model.Line, terms []string) bool {
+			return db001MigrationCompanionTermsMatch(file, line, terms, anchor.requireAllTerms)
+		})
+		obligations = append(obligations, buildResolvedObligation(spec, anchorEvidence, matches))
+	}
+	return obligations
 }
 
 func evaluateDB002(diff model.Diff) (model.Obligation, bool) {
@@ -610,6 +623,32 @@ func collectEvidence(diff model.Diff, limit int, match func(model.File, model.Li
 	return evidence
 }
 
+func collectDB001Anchors(diff model.Diff) []db001Anchor {
+	anchors := make([]db001Anchor, 0)
+	for _, file := range diff.Files {
+		if !isDB001SchemaPath(file.Path) {
+			continue
+		}
+		for hunkIndex, hunk := range file.Hunks {
+			for index, line := range hunk.Lines {
+				if !isChangedLine(line) || !matchesDB001Line(file.Path, line.Text) {
+					continue
+				}
+				if shouldSkipDB001RemovedAnchor(file.Path, hunk, line) {
+					continue
+				}
+				terms, requireAllTerms := extractDB001AnchorSearchTerms(file, hunkIndex, index, line)
+				anchors = append(anchors, db001Anchor{
+					evidence:        []model.Evidence{makeEvidence(file.Path, line)},
+					searchTerms:     terms,
+					requireAllTerms: requireAllTerms,
+				})
+			}
+		}
+	}
+	return anchors
+}
+
 func makeEvidence(filePath string, line model.Line) model.Evidence {
 	lineNumber := line.NewLine
 	if line.Kind == model.LineKindRemoved {
@@ -628,9 +667,29 @@ func isChangedLine(line model.Line) bool {
 	return line.Kind == model.LineKindAdded || line.Kind == model.LineKindRemoved
 }
 
+func shouldSkipDB001RemovedAnchor(filePath string, hunk model.Hunk, line model.Line) bool {
+	if line.Kind != model.LineKindRemoved || !isPrismaSchemaPath(filePath) {
+		return false
+	}
+	removedField, ok := prismaFieldName(line.Text)
+	if !ok {
+		return false
+	}
+	for _, candidate := range hunk.Lines {
+		if candidate.Kind != model.LineKindAdded || !matchesDB001Line(filePath, candidate.Text) {
+			continue
+		}
+		addedField, ok := prismaFieldName(candidate.Text)
+		if ok && strings.EqualFold(removedField, addedField) {
+			return true
+		}
+	}
+	return false
+}
+
 func isDB001SchemaPath(filePath string) bool {
 	switch {
-	case filePath == "schema.prisma":
+	case isPrismaSchemaPath(filePath):
 		return true
 	case filePath == "db/schema.sql":
 		return true
@@ -641,6 +700,12 @@ func isDB001SchemaPath(filePath string) bool {
 	default:
 		return false
 	}
+}
+
+func isPrismaSchemaPath(filePath string) bool {
+	lower := strings.ToLower(filePath)
+	return lower == "schema.prisma" ||
+		(strings.HasPrefix(lower, "prisma/") && strings.HasSuffix(lower, ".prisma"))
 }
 
 func matchesDB001Line(filePath, text string) bool {
@@ -655,11 +720,43 @@ func matchesDB001Line(filePath, text string) bool {
 		}
 	}
 
-	if filePath == "schema.prisma" {
+	if isPrismaSchemaPath(filePath) {
 		return matchesPrismaShapeChange(text)
 	}
 	if strings.HasPrefix(filePath, "ent/schema/") {
 		return strings.Contains(text, "field.") || strings.Contains(text, "index.Fields(") || strings.Contains(text, "index.Edges(")
+	}
+	return false
+}
+
+func db001MigrationCompanionTermsMatch(file model.File, line model.Line, terms []string, requireAllTerms bool) bool {
+	if line.Kind != model.LineKindAdded {
+		return false
+	}
+	if requireAllTerms {
+		return companionTermsAllMatch(line, terms)
+	}
+	return companionTermsMatch(file, line, terms)
+}
+
+func hasDB001MigrationCompanionChange(diff model.Diff) bool {
+	for _, file := range diff.Files {
+		if !isMigrationPath(file.Path) || file.Status == model.FileStatusDeleted {
+			continue
+		}
+		if isMetadataOnlyCompanionMove(file) {
+			return true
+		}
+		for _, hunk := range file.Hunks {
+			for _, line := range hunk.Lines {
+				if line.Kind != model.LineKindAdded || strings.TrimSpace(line.Text) == "" || isCommentLike(line.Text) {
+					continue
+				}
+				if matchesDB001Line(file.Path, line.Text) {
+					return true
+				}
+			}
+		}
 	}
 	return false
 }
@@ -2131,6 +2228,20 @@ func companionTermsMatch(file model.File, line model.Line, terms []string) bool 
 	return false
 }
 
+func companionTermsAllMatch(line model.Line, terms []string) bool {
+	if len(terms) == 0 {
+		return false
+	}
+
+	lowerText := strings.ToLower(line.Text)
+	for _, term := range terms {
+		if !strings.Contains(lowerText, term) {
+			return false
+		}
+	}
+	return true
+}
+
 func extractSearchTerms(evidence []model.Evidence) []string {
 	seen := map[string]struct{}{}
 	terms := make([]string, 0, 8)
@@ -2144,6 +2255,92 @@ func extractSearchTerms(evidence []model.Evidence) []string {
 	}
 
 	return terms
+}
+
+func extractDB001SearchTerms(evidence []model.Evidence) []string {
+	terms := extractSearchTerms(evidence)
+	filtered := make([]string, 0, len(terms))
+	for _, term := range terms {
+		if _, ignored := ignoredDB001SearchTerms[term]; ignored {
+			continue
+		}
+		filtered = append(filtered, term)
+	}
+	return filtered
+}
+
+func extractDB001AnchorSearchTerms(file model.File, hunkIndex int, lineIndex int, line model.Line) ([]string, bool) {
+	if isPrismaSchemaPath(file.Path) {
+		if terms, ok := extractPrismaDB001AnchorSearchTerms(file, hunkIndex, lineIndex, line.Text); ok {
+			return terms, len(terms) > 1
+		}
+	}
+	return extractDB001SearchTerms([]model.Evidence{makeEvidence(file.Path, line)}), false
+}
+
+func extractPrismaDB001AnchorSearchTerms(file model.File, hunkIndex int, lineIndex int, text string) ([]string, bool) {
+	fieldName, ok := prismaFieldName(text)
+	if !ok {
+		return nil, false
+	}
+	fieldTerm := strings.ToLower(fieldName)
+	if _, ignored := ignoredDB001SearchTerms[fieldTerm]; ignored {
+		return nil, false
+	}
+
+	seen := map[string]struct{}{}
+	terms := make([]string, 0, 2)
+	if modelName := enclosingPrismaModelName(file, hunkIndex, lineIndex); modelName != "" {
+		addDB001AnchorTerm(seen, &terms, strings.ToLower(modelName))
+	}
+	addDB001AnchorTerm(seen, &terms, fieldTerm)
+	return terms, len(terms) > 0
+}
+
+func prismaFieldName(text string) (string, bool) {
+	trimmed := strings.TrimSpace(text)
+	if !prismaFieldRE.MatchString(trimmed) {
+		return "", false
+	}
+	fields := strings.Fields(trimmed)
+	if len(fields) == 0 {
+		return "", false
+	}
+	return fields[0], true
+}
+
+func enclosingPrismaModelName(file model.File, hunkIndex int, lineIndex int) string {
+	for index := lineIndex - 1; index >= 0; index-- {
+		matches := prismaModelRE.FindStringSubmatch(file.Hunks[hunkIndex].Lines[index].Text)
+		if len(matches) == 2 {
+			return matches[1]
+		}
+	}
+	for index := hunkIndex - 1; index >= 0; index-- {
+		lines := file.Hunks[index].Lines
+		for lineIndex := len(lines) - 1; lineIndex >= 0; lineIndex-- {
+			matches := prismaModelRE.FindStringSubmatch(lines[lineIndex].Text)
+			if len(matches) == 2 {
+				return matches[1]
+			}
+		}
+	}
+	return ""
+}
+
+func addDB001AnchorTerm(seen map[string]struct{}, terms *[]string, term string) {
+	if len(term) < 3 {
+		return
+	}
+	if _, blocked := ignoredDB001SearchTerms[term]; blocked {
+		return
+	}
+	if _, exists := seen[term]; exists {
+		return
+	}
+
+	seen[term] = struct{}{}
+	*terms = append(*terms, term)
 }
 
 func addSearchTerms(seen map[string]struct{}, terms *[]string, token string) {
@@ -2161,6 +2358,29 @@ func addSearchTerms(seen map[string]struct{}, terms *[]string, token string) {
 	if strings.HasSuffix(cleaned, "s") && !strings.HasSuffix(cleaned, "ss") {
 		addSearchTerm(seen, terms, strings.TrimSuffix(cleaned, "s"))
 	}
+}
+
+var ignoredDB001SearchTerms = map[string]struct{}{
+	"db/schema.sql": {},
+	"schema.prisma": {},
+	"schema":        {},
+	"prisma":        {},
+	"string":        {},
+	"int":           {},
+	"bigint":        {},
+	"float":         {},
+	"decimal":       {},
+	"boolean":       {},
+	"bool":          {},
+	"datetime":      {},
+	"json":          {},
+	"bytes":         {},
+	"text":          {},
+	"unique":        {},
+	"id":            {},
+	"default":       {},
+	"relation":      {},
+	"updatedat":     {},
 }
 
 func extractERR001SearchTerms(evidence []model.Evidence) []string {

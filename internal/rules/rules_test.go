@@ -23,6 +23,12 @@ func TestEvaluateFixtures(t *testing.T) {
 		{name: "db001 deleted migration companion", file: "db001_deleted_migration.diff", want: []string{"DB001"}},
 		{name: "db001 migration only", file: "db001_migration_only.diff", want: nil},
 		{name: "db001 unrelated migration companion", file: "db001_unrelated_migration.diff", want: []string{"DB001"}},
+		{name: "db001 mixed satisfied and missing obligations", file: "db001_mixed_obligations.diff", want: []string{"DB001"}},
+		{name: "db001 generic id with migration", file: "db001_generic_id_with_migration.diff", want: nil},
+		{name: "db001 removed migration line does not satisfy", file: "db001_removed_migration_line.diff", want: []string{"DB001"}},
+		{name: "db001 same field in different models", file: "db001_same_field_different_models.diff", want: []string{"DB001"}},
+		{name: "db001 prisma schema under prisma dir", file: "db001_prisma_schema_dir.diff", want: []string{"DB001"}},
+		{name: "db001 replacement field line", file: "db001_replace_field_line.diff", want: []string{"DB001"}},
 		{name: "db001 ambiguous", file: "db001_ambiguous.diff", want: nil},
 		{name: "db001 metadata-only rename negative", file: "db001_metadata_rename.diff", want: nil},
 		{name: "db002 positive", file: "db002_positive.diff", want: []string{"DB002"}},
@@ -217,6 +223,262 @@ func TestEvaluateObligationsStatuses(t *testing.T) {
 				t.Fatalf("suppressed obligation missing suppression reason: %+v", obligation)
 			}
 		})
+	}
+}
+
+func TestDB001MixedObligations(t *testing.T) {
+	t.Parallel()
+
+	obligations := EvaluateObligations(parseFixture(t, "db001_mixed_obligations.diff"), model.RepoProfile{})
+	if len(obligations) != 2 {
+		t.Fatalf("len(obligations) = %d, want 2: %+v", len(obligations), obligations)
+	}
+
+	statusByExcerpt := map[string]model.ObligationStatus{}
+	for _, obligation := range obligations {
+		if obligation.RuleID != "DB001" {
+			t.Fatalf("rule ID = %s, want DB001: %+v", obligation.RuleID, obligation)
+		}
+		if len(obligation.Evidence) != 1 {
+			t.Fatalf("len(evidence) = %d, want one anchor evidence item: %+v", len(obligation.Evidence), obligation)
+		}
+		if len(obligation.ExpectedCompanions) != 1 || obligation.ExpectedCompanions[0] != "migration file" {
+			t.Fatalf("expected companions = %v, want migration file only", obligation.ExpectedCompanions)
+		}
+		statusByExcerpt[obligation.Evidence[0].Excerpt] = obligation.Status
+
+		switch obligation.Evidence[0].Excerpt {
+		case "email String":
+			if obligation.Status != model.ObligationStatusSatisfied {
+				t.Fatalf("email obligation status = %s, want satisfied: %+v", obligation.Status, obligation)
+			}
+			if obligation.StatusReason == nil || obligation.StatusReason.Reason != model.StatusReasonCompanionPresent {
+				t.Fatalf("email obligation status reason = %+v, want companion_present", obligation.StatusReason)
+			}
+			if len(obligation.RequiredCompanions[0].Satisfiers) == 0 || len(obligation.RequiredCompanions[0].SatisfierEvidence) == 0 {
+				t.Fatalf("email obligation missing satisfier evidence: %+v", obligation)
+			}
+		case "slug String":
+			if obligation.Status != model.ObligationStatusMissing {
+				t.Fatalf("slug obligation status = %s, want missing: %+v", obligation.Status, obligation)
+			}
+			if len(obligation.RequiredCompanions[0].Satisfiers) != 0 || len(obligation.RequiredCompanions[0].SatisfierEvidence) != 0 {
+				t.Fatalf("slug obligation unexpectedly has satisfier evidence: %+v", obligation)
+			}
+		default:
+			t.Fatalf("unexpected DB001 anchor evidence excerpt %q", obligation.Evidence[0].Excerpt)
+		}
+	}
+
+	if statusByExcerpt["email String"] != model.ObligationStatusSatisfied || statusByExcerpt["slug String"] != model.ObligationStatusMissing {
+		t.Fatalf("statuses = %v, want email satisfied and slug missing", statusByExcerpt)
+	}
+
+	findings := FindingsFromObligations(obligations)
+	if len(findings) != 1 {
+		t.Fatalf("len(findings) = %d, want only missing obligation as finding: %+v", len(findings), findings)
+	}
+	if findings[0].RuleID != "DB001" || len(findings[0].Evidence) != 1 || findings[0].Evidence[0].Excerpt != "slug String" {
+		t.Fatalf("finding = %+v, want DB001 finding for slug anchor", findings[0])
+	}
+}
+
+func TestDB001SameFieldInDifferentModelsUsesModelContext(t *testing.T) {
+	t.Parallel()
+
+	obligations := EvaluateObligations(parseFixture(t, "db001_same_field_different_models.diff"), model.RepoProfile{})
+	if len(obligations) != 2 {
+		t.Fatalf("len(obligations) = %d, want 2: %+v", len(obligations), obligations)
+	}
+
+	statusByLine := map[int]model.ObligationStatus{}
+	for _, obligation := range obligations {
+		if obligation.RuleID != "DB001" || len(obligation.Evidence) != 1 {
+			t.Fatalf("obligation = %+v, want one DB001 anchor", obligation)
+		}
+		statusByLine[obligation.Evidence[0].Line] = obligation.Status
+	}
+	if statusByLine[3] != model.ObligationStatusSatisfied || statusByLine[8] != model.ObligationStatusMissing {
+		t.Fatalf("statuses by line = %v, want user status satisfied and project status missing", statusByLine)
+	}
+
+	findings := FindingsFromObligations(obligations)
+	if len(findings) != 1 || len(findings[0].Evidence) != 1 || findings[0].Evidence[0].Line != 8 {
+		t.Fatalf("findings = %+v, want only project status as missing finding", findings)
+	}
+}
+
+func TestDB001ReplacementLineEmitsOneAnchor(t *testing.T) {
+	t.Parallel()
+
+	obligations := EvaluateObligations(parseFixture(t, "db001_replace_field_line.diff"), model.RepoProfile{})
+	if len(obligations) != 1 {
+		t.Fatalf("len(obligations) = %d, want 1 replacement anchor: %+v", len(obligations), obligations)
+	}
+	if obligations[0].Status != model.ObligationStatusMissing || len(obligations[0].Evidence) != 1 {
+		t.Fatalf("obligation = %+v, want one missing DB001 obligation", obligations[0])
+	}
+	if obligations[0].Evidence[0].Kind != string(model.LineKindAdded) || obligations[0].Evidence[0].Excerpt != "email String @unique" {
+		t.Fatalf("evidence = %+v, want added replacement field line", obligations[0].Evidence)
+	}
+}
+
+func TestDB001PrismaAnchorTermsKeepDB001SpecificFieldNames(t *testing.T) {
+	t.Parallel()
+
+	file := model.File{
+		Path: "schema.prisma",
+		Hunks: []model.Hunk{{
+			Lines: []model.Line{
+				{Kind: model.LineKindContext, Text: "model User {"},
+				{Kind: model.LineKindAdded, Text: "  status String", NewLine: 2},
+			},
+		}},
+	}
+	anchors := collectDB001Anchors(model.Diff{Files: []model.File{file}})
+	if len(anchors) != 1 {
+		t.Fatalf("len(anchors) = %d, want 1: %+v", len(anchors), anchors)
+	}
+	if !reflect.DeepEqual(anchors[0].searchTerms, []string{"user", "status"}) || !anchors[0].requireAllTerms {
+		t.Fatalf("anchor terms = %v requireAll=%v, want user+status with all-term matching", anchors[0].searchTerms, anchors[0].requireAllTerms)
+	}
+}
+
+func TestDB001PrismaAnchorTermsUsePreviousHunkModelContext(t *testing.T) {
+	t.Parallel()
+
+	file := model.File{
+		Path: "schema.prisma",
+		Hunks: []model.Hunk{
+			{
+				Lines: []model.Line{
+					{Kind: model.LineKindContext, Text: "model User {"},
+					{Kind: model.LineKindRemoved, Text: "  // old marker", OldLine: 2},
+					{Kind: model.LineKindAdded, Text: "  // new marker", NewLine: 2},
+					{Kind: model.LineKindContext, Text: "  id Int @id"},
+				},
+			},
+			{
+				Lines: []model.Line{
+					{Kind: model.LineKindContext, Text: "  updatedAt DateTime"},
+					{Kind: model.LineKindAdded, Text: "  status String", NewLine: 20},
+					{Kind: model.LineKindContext, Text: "}"},
+				},
+			},
+		},
+	}
+	anchors := collectDB001Anchors(model.Diff{Files: []model.File{file}})
+	if len(anchors) != 1 {
+		t.Fatalf("len(anchors) = %d, want 1: %+v", len(anchors), anchors)
+	}
+	if !reflect.DeepEqual(anchors[0].searchTerms, []string{"user", "status"}) || !anchors[0].requireAllTerms {
+		t.Fatalf("anchor terms = %v requireAll=%v, want previous hunk model context", anchors[0].searchTerms, anchors[0].requireAllTerms)
+	}
+}
+
+func TestUnknownObligationsAreReservedAndDoNotBecomeFindings(t *testing.T) {
+	t.Parallel()
+
+	findings := FindingsFromObligations([]model.Obligation{{
+		RuleID:             "DB001",
+		Status:             model.ObligationStatusUnknown,
+		Severity:           model.SeverityError,
+		Confidence:         "low",
+		Title:              "Unknown companion status",
+		Why:                "The diff-local evidence is intentionally inconclusive.",
+		Evidence:           []model.Evidence{{File: "schema.prisma", Kind: string(model.LineKindAdded), Excerpt: "email String"}},
+		ExpectedCompanions: []string{"migration file"},
+	}})
+	if len(findings) != 0 {
+		t.Fatalf("unknown obligation became finding: %+v", findings)
+	}
+}
+
+func TestDefaultRulesDoNotEmitUnknownStatusOverFixtures(t *testing.T) {
+	t.Parallel()
+
+	entries, err := os.ReadDir(filepath.Join("..", "..", "testdata", "patches"))
+	if err != nil {
+		t.Fatalf("ReadDir(testdata/patches) error = %v", err)
+	}
+	for _, entry := range entries {
+		entry := entry
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".diff" {
+			continue
+		}
+		t.Run(entry.Name(), func(t *testing.T) {
+			t.Parallel()
+
+			for _, obligation := range EvaluateObligations(parseFixture(t, entry.Name()), model.RepoProfile{}) {
+				if obligation.Status == model.ObligationStatusUnknown {
+					t.Fatalf("%s emitted reserved unknown status: %+v", entry.Name(), obligation)
+				}
+			}
+		})
+	}
+}
+
+func TestDB001SearchTermsUseAnchorSpecificTokens(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		evidence []model.Evidence
+		want     []string
+	}{
+		{
+			name:     "prisma field keeps field name",
+			evidence: []model.Evidence{{File: "schema.prisma", Excerpt: "email String @unique"}},
+			want:     []string{"email"},
+		},
+		{
+			name:     "generic id field has no satisfier terms",
+			evidence: []model.Evidence{{File: "schema.prisma", Excerpt: "id Int @id"}},
+			want:     []string{},
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := extractDB001SearchTerms(tc.evidence)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("extractDB001SearchTerms() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDB001RequiresAddedMigrationCompanionEvidence(t *testing.T) {
+	t.Parallel()
+
+	diff := parseFixture(t, "db001_removed_migration_line.diff")
+	obligations := EvaluateObligations(diff, model.RepoProfile{})
+	if len(obligations) != 1 {
+		t.Fatalf("len(obligations) = %d, want 1: %+v", len(obligations), obligations)
+	}
+	obligation := obligations[0]
+	if obligation.RuleID != "DB001" || obligation.Status != model.ObligationStatusMissing {
+		t.Fatalf("obligation = %+v, want DB001 missing", obligation)
+	}
+	if len(obligation.RequiredCompanions[0].SatisfierEvidence) != 0 {
+		t.Fatalf("removed migration line was treated as satisfier evidence: %+v", obligation)
+	}
+}
+
+func TestDB001GenericAnchorWithMigrationCompanionDoesNotOverclaim(t *testing.T) {
+	t.Parallel()
+
+	obligations := EvaluateObligations(parseFixture(t, "db001_generic_id_with_migration.diff"), model.RepoProfile{})
+	for _, obligation := range obligations {
+		if obligation.RuleID == "DB001" {
+			t.Fatalf("generic DB001 anchor emitted despite migration companion movement: %+v", obligations)
+		}
+	}
+	if got := ruleIDs(Evaluate(parseFixture(t, "db001_generic_id_with_migration.diff"), model.RepoProfile{})); len(got) != 0 {
+		t.Fatalf("rule IDs = %v, want no findings", got)
 	}
 }
 
