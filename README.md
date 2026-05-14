@@ -159,6 +159,7 @@ make summary
 make rules
 make rule RULE=DB001
 make fixtures
+make pilot-eval
 ```
 
 `make trial` はこの repository の self-check です。他の project を点検する場合は、まず `make install` で `specbackfill` コマンドを入れてから、対象 project の root で `specbackfill check --fail-on off` を実行します。
@@ -178,6 +179,20 @@ make fixtures
 - 品質改善に入る前に `make trial` または `make test` と `make fixtures` で現在地を確認する
 
 繰り返し同じ種類のノイズが見えたら、 blocking に上げる前に fixture hardening と suppression を小さく入れます。
+
+## Pilot scorecard
+
+blocking へ上げる前に、実 diff の deterministic obligation output を scorecard で採点します。公開 repository には匿名・合成サンプルだけを置き、実 PR 本文、private review text、個人情報、raw private diff は保存しません。
+
+```bash
+specbackfill check --diff-file change.diff --emit-obligations --fail-on off > obligations.json
+specbackfill check --diff-file change.diff --emit-local-ai-review-import --fail-on off > specbackfill-import.jsonl
+python3 scripts/evaluate_pilot.py examples/pilot_scorecard.sample.csv --allow-small-sample --local-ai-review-import yes
+```
+
+scorecard 契約は [schemas/pilot_scorecard.schema.json](./schemas/pilot_scorecard.schema.json)、合成サンプルは [examples/pilot_scorecard.sample.csv](./examples/pilot_scorecard.sample.csv) にあります。判定は `continue`、`continue_advisory_only`、`archive` のいずれかです。`--allow-small-sample` はサンプル確認用で、`archive` 判定は実 pilot 相当の標本数に達した場合だけ有効になります。
+
+`make pilot-eval` は合成サンプル確認用の既定値で動きます。実 pilot では `PILOT_SCORECARD=...` と `PILOT_EVAL_ARGS='--local-ai-review-import yes'` のように明示して使います。
 
 ## 実装済みルール
 
