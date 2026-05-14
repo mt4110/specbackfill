@@ -1007,7 +1007,7 @@ result of Phase 4 pilot evaluation. The public template lives at
 A pilot decision record SHOULD be derived from `scripts/evaluate_pilot.py`
 output and SHOULD contain only anonymous aggregate metrics, public-safe
 rationale, and the final decision state. It MUST NOT include raw private diffs,
-private PR titles, private PR descriptions, private PR comments, private review
+private PR titles, private PR bodies, private PR comments, private review
 text, secrets, personal data, or proprietary repository names.
 
 If no real pilot data exists, the decision record MUST say the pilot is not run
