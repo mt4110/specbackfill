@@ -27,6 +27,8 @@ func TestEvaluateFixtures(t *testing.T) {
 		{name: "db001 generic id with migration", file: "db001_generic_id_with_migration.diff", want: nil},
 		{name: "db001 removed migration line does not satisfy", file: "db001_removed_migration_line.diff", want: []string{"DB001"}},
 		{name: "db001 same field in different models", file: "db001_same_field_different_models.diff", want: []string{"DB001"}},
+		{name: "db001 prisma schema under prisma dir", file: "db001_prisma_schema_dir.diff", want: []string{"DB001"}},
+		{name: "db001 replacement field line", file: "db001_replace_field_line.diff", want: []string{"DB001"}},
 		{name: "db001 ambiguous", file: "db001_ambiguous.diff", want: nil},
 		{name: "db001 metadata-only rename negative", file: "db001_metadata_rename.diff", want: nil},
 		{name: "db002 positive", file: "db002_positive.diff", want: []string{"DB002"}},
@@ -303,6 +305,74 @@ func TestDB001SameFieldInDifferentModelsUsesModelContext(t *testing.T) {
 	findings := FindingsFromObligations(obligations)
 	if len(findings) != 1 || len(findings[0].Evidence) != 1 || findings[0].Evidence[0].Line != 8 {
 		t.Fatalf("findings = %+v, want only project status as missing finding", findings)
+	}
+}
+
+func TestDB001ReplacementLineEmitsOneAnchor(t *testing.T) {
+	t.Parallel()
+
+	obligations := EvaluateObligations(parseFixture(t, "db001_replace_field_line.diff"), model.RepoProfile{})
+	if len(obligations) != 1 {
+		t.Fatalf("len(obligations) = %d, want 1 replacement anchor: %+v", len(obligations), obligations)
+	}
+	if obligations[0].Status != model.ObligationStatusMissing || len(obligations[0].Evidence) != 1 {
+		t.Fatalf("obligation = %+v, want one missing DB001 obligation", obligations[0])
+	}
+	if obligations[0].Evidence[0].Kind != string(model.LineKindAdded) || obligations[0].Evidence[0].Excerpt != "email String @unique" {
+		t.Fatalf("evidence = %+v, want added replacement field line", obligations[0].Evidence)
+	}
+}
+
+func TestDB001PrismaAnchorTermsKeepDB001SpecificFieldNames(t *testing.T) {
+	t.Parallel()
+
+	file := model.File{
+		Path: "schema.prisma",
+		Hunks: []model.Hunk{{
+			Lines: []model.Line{
+				{Kind: model.LineKindContext, Text: "model User {"},
+				{Kind: model.LineKindAdded, Text: "  status String", NewLine: 2},
+			},
+		}},
+	}
+	anchors := collectDB001Anchors(model.Diff{Files: []model.File{file}})
+	if len(anchors) != 1 {
+		t.Fatalf("len(anchors) = %d, want 1: %+v", len(anchors), anchors)
+	}
+	if !reflect.DeepEqual(anchors[0].searchTerms, []string{"user", "status"}) || !anchors[0].requireAllTerms {
+		t.Fatalf("anchor terms = %v requireAll=%v, want user+status with all-term matching", anchors[0].searchTerms, anchors[0].requireAllTerms)
+	}
+}
+
+func TestDB001PrismaAnchorTermsUsePreviousHunkModelContext(t *testing.T) {
+	t.Parallel()
+
+	file := model.File{
+		Path: "schema.prisma",
+		Hunks: []model.Hunk{
+			{
+				Lines: []model.Line{
+					{Kind: model.LineKindContext, Text: "model User {"},
+					{Kind: model.LineKindRemoved, Text: "  // old marker", OldLine: 2},
+					{Kind: model.LineKindAdded, Text: "  // new marker", NewLine: 2},
+					{Kind: model.LineKindContext, Text: "  id Int @id"},
+				},
+			},
+			{
+				Lines: []model.Line{
+					{Kind: model.LineKindContext, Text: "  updatedAt DateTime"},
+					{Kind: model.LineKindAdded, Text: "  status String", NewLine: 20},
+					{Kind: model.LineKindContext, Text: "}"},
+				},
+			},
+		},
+	}
+	anchors := collectDB001Anchors(model.Diff{Files: []model.File{file}})
+	if len(anchors) != 1 {
+		t.Fatalf("len(anchors) = %d, want 1: %+v", len(anchors), anchors)
+	}
+	if !reflect.DeepEqual(anchors[0].searchTerms, []string{"user", "status"}) || !anchors[0].requireAllTerms {
+		t.Fatalf("anchor terms = %v requireAll=%v, want previous hunk model context", anchors[0].searchTerms, anchors[0].requireAllTerms)
 	}
 }
 

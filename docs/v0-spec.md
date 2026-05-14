@@ -572,6 +572,10 @@ include at least:
 Rules MAY emit zero or more obligations. Status is assigned per obligation
 anchor group, not per rule globally, so one rule can emit both `satisfied` and
 `missing` obligations for different anchors in the same diff.
+This also means a rule MAY fan out into multiple findings when a diff creates
+multiple independently unresolved anchors. Consumers SHOULD treat
+`obligation_id` and anchor evidence as the stable unit for deduplication instead
+of assuming one obligation per rule.
 
 When an obligation is `satisfied`, companion-present evidence MUST be visible
 from `required_companions[*].satisfier_evidence` and summarized by
@@ -724,6 +728,8 @@ Detect a persisted data shape change whose diff does not include a migration com
 
 - file paths such as:
   - `schema.prisma`
+  - `prisma/schema.prisma`
+  - `prisma/**/*.prisma`
   - `db/schema.sql`
   - `ent/schema/**`
   - `sqlc/schema/**`
