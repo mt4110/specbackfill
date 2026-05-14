@@ -58,10 +58,26 @@ def go_command() -> list[str]:
     override = shutil.which("go")
     if override:
         return [override]
+
     mise = shutil.which("mise")
     if mise:
-        return [mise, "exec", "--", "go"]
+        goroot = command_stdout([mise, "exec", "--", "go", "env", "GOROOT"])
+        if goroot:
+            go_binary = Path(goroot) / "bin" / "go"
+            if go_binary.exists():
+                return [str(go_binary)]
+        go_binary = command_stdout([mise, "exec", "--", "which", "go"])
+        if go_binary and Path(go_binary).exists():
+            return [go_binary]
+
     return ["go"]
+
+
+def command_stdout(cmd: list[str]) -> str:
+    result = subprocess.run(cmd, text=True, capture_output=True)
+    if result.returncode != 0:
+        return ""
+    return result.stdout.strip()
 
 
 def validate(instance: Any, schema: dict[str, Any], root: dict[str, Any], path: str = "$") -> list[str]:
@@ -251,7 +267,7 @@ def main() -> int:
                 [str(binary), "check", "--diff-file", str(patch), "--emit-obligations", "--fail-on", "off"],
                 root,
             )
-            if obligations.returncode not in (0, 1):
+            if obligations.returncode != 0:
                 failures.append(f"{patch.name}: obligations command failed: {obligations.stderr.strip()}")
                 continue
             try:
@@ -268,7 +284,7 @@ def main() -> int:
                 [str(binary), "check", "--diff-file", str(patch), "--emit-local-ai-review-import", "--fail-on", "off"],
                 root,
             )
-            if imported.returncode not in (0, 1):
+            if imported.returncode != 0:
                 failures.append(f"{patch.name}: import command failed: {imported.stderr.strip()}")
                 continue
             for index, line in enumerate(imported.stdout.splitlines(), start=1):

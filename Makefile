@@ -8,7 +8,7 @@ GO ?= $(shell \
 		if [ -n "$$goroot" ] && [ -x "$$goroot/bin/go" ]; then printf '%s/bin/go' "$$goroot"; else command -v go; fi; \
 	elif command -v mise >/dev/null 2>&1; then \
 		goroot=$$(mise exec -- go env GOROOT 2>/dev/null || true); \
-		if [ -n "$$goroot" ] && [ -x "$$goroot/bin/go" ]; then printf '%s/bin/go' "$$goroot"; else printf 'mise exec -- go'; fi; \
+		if [ -n "$$goroot" ] && [ -x "$$goroot/bin/go" ]; then printf '%s/bin/go' "$$goroot"; else printf go; fi; \
 	else \
 		printf go; \
 	fi)
