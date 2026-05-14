@@ -182,7 +182,7 @@ make pilot-eval
 
 ## Pilot scorecard
 
-blocking へ上げる前に、実 diff の deterministic obligation output を scorecard で採点します。公開 repository には匿名・合成サンプルだけを置き、実 PR 本文、private review text、個人情報、raw private diff は保存しません。
+blocking へ上げる前に、実 diff の deterministic obligation output を scorecard で採点します。公開 repository には匿名・合成サンプルだけを置き、実 PR の title/body/comment、private review text、個人情報、raw private diff は保存しません。
 
 ```bash
 specbackfill check --diff-file change.diff --emit-obligations --fail-on off > obligations.json
@@ -193,6 +193,8 @@ python3 scripts/evaluate_pilot.py examples/pilot_scorecard.sample.csv --allow-sm
 scorecard 契約は [schemas/pilot_scorecard.schema.json](./schemas/pilot_scorecard.schema.json)、合成サンプルは [examples/pilot_scorecard.sample.csv](./examples/pilot_scorecard.sample.csv) にあります。判定は `continue`、`continue_advisory_only`、`archive` のいずれかです。`--allow-small-sample` はサンプル確認用で、`archive` 判定は実 pilot 相当の標本数に達した場合だけ有効になります。
 
 `make pilot-eval` は合成サンプル確認用の既定値で動きます。実 pilot では `PILOT_SCORECARD=...` と `PILOT_EVAL_ARGS='--local-ai-review-import yes'` のように明示して使います。
+
+pilot decision を公開 repository に残す場合は [examples/pilot_decision_record.template.md](./examples/pilot_decision_record.template.md) の項目を使い、`scripts/evaluate_pilot.py` の出力から匿名・集計値だけを記録します。実 pilot データがない場合は `Pilot status: not_run` / `Decision: pending` とし、数値を推測で埋めません。実 PR の title/body/comment、private review text、raw private diff、個人情報、proprietary repo 名は commit しません。合成サンプルは workflow 確認用であり、pilot decision の根拠にはしません。
 
 ## 実装済みルール
 

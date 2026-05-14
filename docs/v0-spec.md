@@ -987,14 +987,42 @@ a change to `specbackfill check` exit semantics.
 Small synthetic samples MAY opt into sample-size override for smoke testing,
 but archive decisions SHOULD require the real-pilot minimum sample size.
 
-Pilot scorecards committed to the public repository MUST be public-safe. They
-MUST NOT include raw private diffs, private PR bodies, private review text,
-secrets, personal data, or proprietary repository names. Real pilot scorecards
-SHOULD stay local unless they have been reduced to public-safe aggregate rows.
+Any pilot scorecard committed to the public repository MUST be public-safe. It
+MUST NOT include raw private diffs, private PR titles, private PR bodies,
+private PR comments, private review text, secrets, personal data, or
+proprietary repository names. Committed scorecards SHOULD be synthetic samples
+only. Real pilot scorecards SHOULD stay local, and real pilot results SHOULD be
+represented publicly only as public-safe aggregate decision records.
 
 The pilot workflow MUST NOT add AI/LLM detection, PR comment posting,
 `local-ai-review` review-history storage, `review-firewall` triage/routing, new
 companion rules, or stricter default CI failure behavior.
+
+### 11.2 Pilot decision record
+
+v0 MAY include a public-safe pilot decision record template for summarizing the
+result of Phase 4 pilot evaluation. The public template lives at
+`examples/pilot_decision_record.template.md`.
+
+A pilot decision record SHOULD be derived from `scripts/evaluate_pilot.py`
+output and SHOULD contain only anonymous aggregate metrics, public-safe
+rationale, and the final decision state. It MUST NOT include raw private diffs,
+private PR titles, private PR descriptions, private PR comments, private review
+text, secrets, personal data, or proprietary repository names.
+
+If no real pilot data exists, the decision record MUST say the pilot is not run
+or pending. It MUST NOT infer, invent, or backfill metric values from intuition
+or from the synthetic sample. The synthetic sample MAY verify the workflow, but
+MUST NOT be used as the evidence base for a pilot decision.
+
+`continue`, `continue_advisory_only`, and `archive` decisions SHOULD correspond
+to the evaluator output and the strategy thresholds. Archive decisions SHOULD
+only be treated as terminal after the real-pilot sample threshold is met.
+
+A pilot decision record MUST NOT change `specbackfill check` behavior, default
+CI failure behavior, JSON schema semantics, rule severity, rule coverage, or
+the ownership boundaries between `specbackfill`, `local-ai-review`, and
+`review-firewall`.
 
 ## 12. AI Behavior
 

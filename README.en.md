@@ -182,7 +182,7 @@ If the same noisy pattern repeats, harden fixtures and suppressions in a small s
 
 ## Pilot Scorecard
 
-Before turning this into a blocking check, score deterministic obligation output over real diffs. The public repository keeps only anonymized synthetic samples; do not commit real PR bodies, private review text, personal data, or raw private diffs.
+Before turning this into a blocking check, score deterministic obligation output over real diffs. The public repository keeps only anonymized synthetic samples; do not commit real PR titles, bodies, comments, private review text, personal data, or raw private diffs.
 
 ```bash
 specbackfill check --diff-file change.diff --emit-obligations --fail-on off > obligations.json
@@ -193,6 +193,8 @@ python3 scripts/evaluate_pilot.py examples/pilot_scorecard.sample.csv --allow-sm
 The scorecard contract is [schemas/pilot_scorecard.schema.json](./schemas/pilot_scorecard.schema.json), and the synthetic sample is [examples/pilot_scorecard.sample.csv](./examples/pilot_scorecard.sample.csv). The evaluator returns one decision: `continue`, `continue_advisory_only`, or `archive`. `--allow-small-sample` is for sample verification; `archive` decisions only apply after the sample reaches the real-pilot threshold.
 
 `make pilot-eval` uses defaults for checking the synthetic sample. For a real pilot, pass explicit values such as `PILOT_SCORECARD=...` and `PILOT_EVAL_ARGS='--local-ai-review-import yes'`.
+
+When recording a pilot decision in the public repository, use the fields in [examples/pilot_decision_record.template.md](./examples/pilot_decision_record.template.md) and record only anonymized aggregate values from `scripts/evaluate_pilot.py`. If no real pilot data exists, use `Pilot status: not_run` / `Decision: pending` and do not infer metrics. Do not commit real PR titles, bodies, comments, private review text, raw private diffs, personal data, or proprietary repository names. The synthetic sample is for workflow verification, not as evidence for a pilot decision.
 
 ## Implemented Rules
 
