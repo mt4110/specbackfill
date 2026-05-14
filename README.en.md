@@ -196,6 +196,8 @@ The scorecard contract is [schemas/pilot_scorecard.schema.json](./schemas/pilot_
 
 When recording a pilot decision in the public repository, use the fields in [examples/pilot_decision_record.template.md](./examples/pilot_decision_record.template.md) and record only anonymized aggregate values from `scripts/evaluate_pilot.py`. If no real pilot data exists, use `Pilot status: not_run` / `Decision: pending` and do not infer metrics. Do not commit real PR titles, bodies, comments, private review text, raw private diffs, personal data, or proprietary repository names. The synthetic sample is for workflow verification, not as evidence for a pilot decision.
 
+If no public-safe aggregate exists for the real pilot, do not create an evaluated decision record. Keep the project advisory-only and rely on the template and README workflow until real pilot evidence is available.
+
 ## Implemented Rules
 
 - `DB001`: Schema changed, no migration moved with the diff

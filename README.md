@@ -196,6 +196,8 @@ scorecard 契約は [schemas/pilot_scorecard.schema.json](./schemas/pilot_scorec
 
 pilot decision を公開 repository に残す場合は [examples/pilot_decision_record.template.md](./examples/pilot_decision_record.template.md) の項目を使い、`scripts/evaluate_pilot.py` の出力から匿名・集計値だけを記録します。実 pilot データがない場合は `Pilot status: not_run` / `Decision: pending` とし、数値を推測で埋めません。実 PR の title/body/comment、private review text、raw private diff、個人情報、proprietary repo 名は commit しません。合成サンプルは workflow 確認用であり、pilot decision の根拠にはしません。
 
+実 pilot の public-safe aggregate がまだない場合は、評価済み decision record を作らず、template と README の運用だけを根拠に advisory のまま止めます。
+
 ## 実装済みルール
 
 - `DB001`: Schema changed, no migration moved with the diff
