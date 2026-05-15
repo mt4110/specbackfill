@@ -607,10 +607,15 @@ func writeTextTodo(w io.Writer, obligations []model.Obligation, options Options)
 	if err := writeTextInputSummary(w, options); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "%d unresolved obligations\n", len(missing)); err != nil {
+	count := len(missing)
+	obligationLabel := "obligations"
+	if count == 1 {
+		obligationLabel = "obligation"
+	}
+	if _, err := fmt.Fprintf(w, "%d unresolved %s\n", count, obligationLabel); err != nil {
 		return err
 	}
-	if len(missing) == 0 {
+	if count == 0 {
 		if _, err := fmt.Fprintln(w, "No next actions from implemented v0 rules."); err != nil {
 			return err
 		}
