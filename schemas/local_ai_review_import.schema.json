@@ -29,7 +29,9 @@
     "anchor",
     "required_companions",
     "evidence",
-    "suppression"
+    "status_reason",
+    "suppression",
+    "raw_json"
   ],
   "properties": {
     "schema_version": {
@@ -196,7 +198,10 @@
       }
     },
     "status_reason": {
-      "type": "object",
+      "type": [
+        "object",
+        "null"
+      ],
       "required": [
         "reason",
         "evidence"
@@ -213,6 +218,83 @@
         }
       },
       "additionalProperties": false
+    },
+    "raw_json": {
+      "type": "object",
+      "description": "The raw normalized obligations.v1 obligation object that this import item was derived from.",
+      "required": [
+        "obligation_id",
+        "rule_id",
+        "rule_version",
+        "status",
+        "severity",
+        "confidence",
+        "title",
+        "why",
+        "diff_local_claim",
+        "anchor",
+        "required_companions",
+        "evidence",
+        "suppression",
+        "downstream"
+      ],
+      "properties": {
+        "obligation_id": {
+          "type": "string"
+        },
+        "rule_id": {
+          "type": "string"
+        },
+        "rule_version": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warn",
+            "info"
+          ]
+        },
+        "confidence": {
+          "type": "string",
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "why": {
+          "type": "string"
+        },
+        "diff_local_claim": {
+          "const": true
+        },
+        "anchor": {
+          "type": "object"
+        },
+        "required_companions": {
+          "type": "array"
+        },
+        "evidence": {
+          "type": "array"
+        },
+        "suppression": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "downstream": {
+          "type": "object"
+        }
+      }
     },
     "suppression": {
       "type": [
@@ -255,6 +337,7 @@
         ],
         "properties": {
           "status_reason": {
+            "type": "object",
             "properties": {
               "reason": {
                 "const": "companion_present"
@@ -305,6 +388,7 @@
         ],
         "properties": {
           "status_reason": {
+            "type": "object",
             "properties": {
               "reason": {
                 "$ref": "#/$defs/suppression_reason"

@@ -477,6 +477,16 @@ func TestBuildLocalAIReviewImportItems(t *testing.T) {
 	if !item.DiffLocalClaim || len(item.Evidence) == 0 || len(item.Anchor.Evidence) == 0 || len(item.RequiredCompanions) == 0 {
 		t.Fatalf("import item lost diff-local evidence: %+v", item)
 	}
+	if len(item.RawJSON) == 0 {
+		t.Fatalf("import item missing raw obligation JSON: %+v", item)
+	}
+	var rawObligation model.Obligation
+	if err := json.Unmarshal(item.RawJSON, &rawObligation); err != nil {
+		t.Fatalf("raw_json is not an obligation object: %v\n%s", err, string(item.RawJSON))
+	}
+	if rawObligation.ObligationID != item.ObligationID || rawObligation.RuleID != item.RuleID {
+		t.Fatalf("raw_json does not preserve source obligation: raw=%+v item=%+v", rawObligation, item)
+	}
 }
 
 func TestBuildLocalAIReviewImportItemsPreservesDecodedArtifactIDs(t *testing.T) {
@@ -674,6 +684,8 @@ func TestLocalAIReviewImportSchemaDocumentsRequiredFields(t *testing.T) {
 		"title",
 		"diff_local_claim",
 		"evidence_digest",
+		"status_reason",
+		"raw_json",
 	} {
 		if !containsString(schema.Required, field) {
 			t.Fatalf("schema required fields missing %q: %v", field, schema.Required)

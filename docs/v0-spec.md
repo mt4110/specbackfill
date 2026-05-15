@@ -638,12 +638,25 @@ history to score it separately from AI-authored findings:
 - `anchor`
 - `required_companions`
 - `evidence`
+- `status_reason`
 - `suppression`
+- `raw_json`
 
 `source` and `source_signal` MUST be `specbackfill`. `import_kind` MUST be
 `deterministic_static_layer`. `item_id` SHOULD be the deterministic
 `obligation_id`. `evidence_digest` MUST be a deterministic SHA-256 digest over
 the imported evidence and companion/suppression evidence for that item.
+`status_reason` MUST be present as `null` when no status reason applies.
+`raw_json` MUST contain the normalized `obligations.v1` obligation object used
+to derive the import item so downstream consumers can store the deterministic
+source record separately from AI-authored findings.
+
+Compatibility note: during the v0 productization line,
+`local_ai_review_import.v1` is the active pre-release adapter contract used for
+the Week 5 consumption proof. Additive fields in this adapter MUST be documented
+in this section, covered by the schema and golden outputs, and preserved by
+downstream consumers. Removing fields or changing the meaning of an existing
+field requires a new schema version.
 
 This format MUST preserve all obligation status values, including `satisfied`
 and `suppressed`, so downstream tools can display deterministic obligations as

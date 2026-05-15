@@ -72,7 +72,7 @@ specbackfill fixtures report
 - `--summary`: shows only severity counts and fired rules. It does not change finding evaluation.
 - `--explain`: adds grounded explanations tied to existing findings. It does not add findings.
 - `--emit-obligations`: emits an `obligations.v1` JSON artifact with `schema_version`, `tool`, `run`, and `obligations`. The artifact also exposes companion evidence for `satisfied` obligations and reason/evidence for `suppressed` obligations. Omit `--format` or use `--format json`.
-- `--emit-local-ai-review-import`: emits `local_ai_review_import.v1` JSONL. Each line has deterministic item ID, run ID, rule ID, status, severity, title, diff-local evidence digest, and `source/import_kind`. Do not combine it with `--format`.
+- `--emit-local-ai-review-import`: emits `local_ai_review_import.v1` JSONL. Each line has deterministic item ID, run ID, rule ID, status, severity, title, diff-local evidence digest, status reason, raw obligation JSON, and `source/import_kind`. Do not combine it with `--format`.
 - JSON findings include deterministic `finding_id` and `omission_signature` fields.
 - Normal `--format json` is the findings contract. The obligation/status artifact is a separate contract described by [schemas/obligations.schema.json](./schemas/obligations.schema.json).
 - The local-ai-review import JSONL adapter contract is described by [schemas/local_ai_review_import.schema.json](./schemas/local_ai_review_import.schema.json).
