@@ -101,10 +101,19 @@ func BuildLocalAIReviewImportItems(artifact model.ObligationArtifact) []model.Lo
 			Evidence:           obligation.Evidence,
 			StatusReason:       obligation.StatusReason,
 			Suppression:        obligation.Suppression,
+			RawJSON:            rawObligationJSON(obligation),
 		})
 	}
 
 	return items
+}
+
+func rawObligationJSON(obligation model.Obligation) json.RawMessage {
+	raw, err := json.Marshal(obligation)
+	if err != nil {
+		return json.RawMessage("null")
+	}
+	return raw
 }
 
 type obligationNormalizationOptions struct {

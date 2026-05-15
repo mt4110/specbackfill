@@ -72,7 +72,7 @@ specbackfill fixtures report
 - `--summary`: severity counts と fired rules だけを表示します。finding 判定は変えません。
 - `--explain`: 既存 finding に紐づく grounded explanation を追加します。finding 自体は増やしません。
 - `--emit-obligations`: `schema_version`, `tool`, `run`, `obligations` を持つ `obligations.v1` JSON artifact を出します。`satisfied` の companion evidence と `suppressed` の reason/evidence もこの artifact で確認できます。`--format` は省略するか `--format json` を指定します。
-- `--emit-local-ai-review-import`: `local_ai_review_import.v1` JSONL を出します。各行は deterministic item ID、run ID、rule ID、status、severity、title、diff-local evidence digest、`source/import_kind` を持ちます。`--format` とは併用しません。
+- `--emit-local-ai-review-import`: `local_ai_review_import.v1` JSONL を出します。各行は deterministic item ID、run ID、rule ID、status、severity、title、diff-local evidence digest、status reason、raw obligation JSON、`source/import_kind` を持ちます。`--format` とは併用しません。
 - JSON findings には deterministic な `finding_id` と `omission_signature` が入ります。
 - 通常の `--format json` は findings 契約です。obligation/status artifact は [schemas/obligations.schema.json](./schemas/obligations.schema.json) に従う別契約です。
 - local-ai-review import JSONL は [schemas/local_ai_review_import.schema.json](./schemas/local_ai_review_import.schema.json) に従う adapter 契約です。

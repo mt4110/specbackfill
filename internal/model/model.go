@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"path"
 	"strings"
 )
@@ -255,8 +256,9 @@ type LocalAIReviewImportItem struct {
 	Anchor             ObligationAnchor        `json:"anchor"`
 	RequiredCompanions []RequiredCompanion     `json:"required_companions"`
 	Evidence           []Evidence              `json:"evidence"`
-	StatusReason       *ObligationStatusReason `json:"status_reason,omitempty"`
+	StatusReason       *ObligationStatusReason `json:"status_reason"`
 	Suppression        *ObligationSuppression  `json:"suppression"`
+	RawJSON            json.RawMessage         `json:"raw_json"`
 }
 
 type Evidence struct {
