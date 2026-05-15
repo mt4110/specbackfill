@@ -19,7 +19,7 @@ BINDIR ?= $(PREFIX)/bin
 VERSION ?= v0
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || printf unknown)
 BUILT ?= $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
-LDFLAGS ?= -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.built=$(BUILT)
+SPECBACKFILL_LDFLAGS ?= -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.built=$(BUILT)
 BASE ?= main
 HEAD ?= HEAD
 DIFF ?=
@@ -53,7 +53,7 @@ help:
 
 install:
 	@mkdir -p "$(BINDIR)"
-	@$(GO) build -ldflags "$(LDFLAGS)" -o "$(BINDIR)/specbackfill" ./cmd/specbackfill
+	@$(GO) build -ldflags "$(SPECBACKFILL_LDFLAGS)" -o "$(BINDIR)/specbackfill" ./cmd/specbackfill
 	@printf 'Installed: %s/specbackfill\n' "$(BINDIR)"
 	@"$(BINDIR)/specbackfill" --version
 	@case ":$$PATH:" in \
@@ -106,7 +106,7 @@ test-mise:
 	@$(PYTHON) scripts/schema_validate_testdata.py --repo-root .
 
 release-smoke:
-	@bash scripts/release_smoke.sh .
+	@SPECBACKFILL_GO="$(GO)" bash scripts/release_smoke.sh .
 
 check:
 	@$(SPECBACKFILL) check --fail-on off
