@@ -36,6 +36,22 @@ class SchemaValidateTestdataTest(unittest.TestCase):
 
         self.assertTrue(any("$.source_label" in error and "pattern" in error for error in errors))
 
+    def test_pilot_scorecard_schema_rejects_useful_fixed_without_action(self) -> None:
+        schema = load_schema()
+        row = sample_row(operator_verdict="useful_fixed", was_actioned="false")
+
+        errors = schema_validate_testdata.validate(row, schema, schema)
+
+        self.assertTrue(any("was_actioned" in error and "expected one of" in error for error in errors), errors)
+
+    def test_pilot_scorecard_schema_rejects_action_without_useful_fixed(self) -> None:
+        schema = load_schema()
+        row = sample_row(operator_verdict="useful_noted", was_actioned="true")
+
+        errors = schema_validate_testdata.validate(row, schema, schema)
+
+        self.assertTrue(any("operator_verdict" in error and "useful_fixed" in error for error in errors), errors)
+
     def test_additional_properties_with_csv_extra_column_are_reported(self) -> None:
         schema = load_schema()
         row = sample_row()

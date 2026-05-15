@@ -36,6 +36,9 @@ class EvaluatePilotTest(unittest.TestCase):
         self.assertFalse(metrics["continue_checks"]["sample_size"])
         self.assertFalse(metrics["continue_checks"]["duplicate_with_review_firewall_rate"])
         self.assertTrue(metrics["continue_checks"]["local_ai_review_import_path"])
+        self.assertFalse(metrics["week7_beta_dogfood_ready"])
+        self.assertFalse(metrics["beta_thresholds_pass"])
+        self.assertFalse(metrics["beta_blocking_consideration_auto_checks_pass"])
 
     def test_false_positive_requires_reason(self) -> None:
         path = write_scorecard([row(operator_verdict="false_positive")])
@@ -127,6 +130,96 @@ class EvaluatePilotTest(unittest.TestCase):
         self.assertTrue(metrics["fair_sample"])
         self.assertTrue(metrics["continue_checks"]["sample_size"])
         self.assertEqual(metrics["sample_ref_count"], 30)
+        self.assertFalse(metrics["week7_beta_dogfood_ready"])
+
+    def test_beta_dogfood_checks_pass_with_sixty_rows_three_sources_and_action(self) -> None:
+        rows = [
+            row(
+                sample_id=f"S{index:03}",
+                source_label=f"repo-{index % 3}",
+                sample_ref=f"real-diff-{index:03}",
+                obligation_id=f"obl-v1-{index:016x}",
+                was_actioned="true" if index < 10 else "false",
+                operator_verdict="useful_fixed" if index < 10 else "useful_noted",
+            )
+            for index in range(60)
+        ]
+        decision, metrics = evaluate_pilot.evaluate(
+            rows,
+            args(allow_small_sample=False, local_ai_review_import="yes"),
+        )
+
+        self.assertEqual(decision, "continue")
+        self.assertTrue(metrics["week7_beta_dogfood_ready"])
+        self.assertTrue(metrics["beta_thresholds_pass"])
+        self.assertTrue(metrics["beta_blocking_consideration_auto_checks_pass"])
+
+    def test_blocking_consideration_needs_ten_actioned_rows(self) -> None:
+        rows = [
+            row(
+                sample_id=f"S{index:03}",
+                source_label=f"repo-{index % 3}",
+                sample_ref=f"real-diff-{index:03}",
+                obligation_id=f"obl-v1-{index:016x}",
+                was_actioned="true" if index == 0 else "false",
+                operator_verdict="useful_fixed" if index == 0 else "useful_noted",
+            )
+            for index in range(60)
+        ]
+        decision, metrics = evaluate_pilot.evaluate(
+            rows,
+            args(allow_small_sample=False, local_ai_review_import="yes"),
+        )
+
+        self.assertEqual(decision, "continue")
+        self.assertTrue(metrics["week7_beta_dogfood_ready"])
+        self.assertTrue(metrics["beta_thresholds_pass"])
+        self.assertFalse(metrics["beta_blocking_consideration_auto_checks_pass"])
+
+    def test_beta_dogfood_requires_useful_actioned_row(self) -> None:
+        rows = [
+            row(
+                sample_id=f"S{index:03}",
+                source_label=f"repo-{index % 3}",
+                sample_ref=f"real-diff-{index:03}",
+                obligation_id=f"obl-v1-{index:016x}",
+                operator_verdict="useful_noted",
+            )
+            for index in range(60)
+        ]
+        decision, metrics = evaluate_pilot.evaluate(
+            rows,
+            args(allow_small_sample=False, local_ai_review_import="yes"),
+        )
+
+        self.assertEqual(decision, "continue")
+        self.assertEqual(metrics["actioned"], 0)
+        self.assertEqual(metrics["useful_actioned"], 0)
+        self.assertFalse(metrics["week7_beta_dogfood_ready"])
+        self.assertFalse(metrics["beta_thresholds_pass"])
+
+    def test_beta_thresholds_require_continue_checks(self) -> None:
+        rows = [
+            row(
+                sample_id=f"S{index:03}",
+                source_label=f"repo-{index % 3}",
+                sample_ref=f"real-diff-{index:03}",
+                obligation_id=f"obl-v1-{index:016x}",
+                was_actioned="true" if index < 10 else "false",
+                operator_verdict="useful_fixed" if index < 10 else "useful_noted",
+                evidence_ok="false",
+            )
+            for index in range(60)
+        ]
+        decision, metrics = evaluate_pilot.evaluate(
+            rows,
+            args(allow_small_sample=False, local_ai_review_import="yes"),
+        )
+
+        self.assertEqual(decision, "continue_advisory_only")
+        self.assertFalse(metrics["continue_checks"]["evidence_coverage"])
+        self.assertTrue(metrics["week7_beta_dogfood_ready"])
+        self.assertFalse(metrics["beta_thresholds_pass"])
 
     def test_duplicate_verdict_requires_matching_flag(self) -> None:
         path = write_scorecard([row(operator_verdict="duplicate_with_local_ai_review")])
@@ -155,6 +248,20 @@ class EvaluatePilotTest(unittest.TestCase):
         self.addCleanup(path.unlink, missing_ok=True)
 
         with self.assertRaisesRegex(ValueError, "cannot both be true"):
+            evaluate_pilot.read_rows(path)
+
+    def test_useful_fixed_requires_actioned_flag(self) -> None:
+        path = write_scorecard([row(operator_verdict="useful_fixed")])
+        self.addCleanup(path.unlink, missing_ok=True)
+
+        with self.assertRaisesRegex(ValueError, "useful_fixed rows require was_actioned=true"):
+            evaluate_pilot.read_rows(path)
+
+    def test_actioned_flag_requires_useful_fixed_verdict(self) -> None:
+        path = write_scorecard([row(was_actioned="true")])
+        self.addCleanup(path.unlink, missing_ok=True)
+
+        with self.assertRaisesRegex(ValueError, "was_actioned=true requires operator_verdict=useful_fixed"):
             evaluate_pilot.read_rows(path)
 
     def test_public_safe_labels_must_be_opaque(self) -> None:
