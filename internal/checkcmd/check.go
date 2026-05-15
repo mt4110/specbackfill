@@ -7,8 +7,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/mt4110/specbackfill/internal/diffinput"
 	"github.com/mt4110/specbackfill/internal/diffparse"
-	"github.com/mt4110/specbackfill/internal/diffsrc"
 	"github.com/mt4110/specbackfill/internal/explain"
 	"github.com/mt4110/specbackfill/internal/profile"
 	"github.com/mt4110/specbackfill/internal/report"
@@ -59,16 +59,17 @@ func RunWithOptions(ctx context.Context, cwd string, args []string, stdout, stde
 	if flags.NArg() != 0 {
 		return writeError(stderr, "unexpected positional arguments")
 	}
-	if err := validateFlags(base, head, diffFile, format, failOn, summaryOnly, includeExplanations, emitObligations, emitLocalAIReviewImport, flagWasProvided(flags, "format")); err != nil {
+	selection := diffinput.Selection{Base: base, Head: head, DiffFile: diffFile}
+	if err := validateFlags(selection, format, failOn, summaryOnly, includeExplanations, emitObligations, emitLocalAIReviewImport, flagWasProvided(flags, "format")); err != nil {
 		return writeError(stderr, err.Error())
 	}
 
-	diffRoot, profileRoot, err := resolveRoots(ctx, cwd, diffFile)
+	diffRoot, profileRoot, err := diffinput.ResolveRoots(ctx, cwd, selection)
 	if err != nil {
 		return writeError(stderr, err.Error())
 	}
 
-	diffInput, err := loadDiff(ctx, diffRoot, base, head, diffFile)
+	diffInput, err := diffinput.Load(ctx, diffRoot, selection)
 	if err != nil {
 		return writeError(stderr, err.Error())
 	}
@@ -94,7 +95,7 @@ func RunWithOptions(ctx context.Context, cwd string, args []string, stdout, stde
 	if emitObligations {
 		artifact := report.BuildObligationArtifact(report.ObligationArtifactOptions{
 			ToolVersion: toolVersion,
-			InputKind:   inputKind(base, head, diffFile),
+			InputKind:   diffinput.Kind(selection),
 			Base:        base,
 			Head:        head,
 			DiffInput:   diffInput,
@@ -108,7 +109,7 @@ func RunWithOptions(ctx context.Context, cwd string, args []string, stdout, stde
 	if emitLocalAIReviewImport {
 		artifact := report.BuildObligationArtifact(report.ObligationArtifactOptions{
 			ToolVersion: toolVersion,
-			InputKind:   inputKind(base, head, diffFile),
+			InputKind:   diffinput.Kind(selection),
 			Base:        base,
 			Head:        head,
 			DiffInput:   diffInput,
@@ -122,8 +123,8 @@ func RunWithOptions(ctx context.Context, cwd string, args []string, stdout, stde
 
 	reportOptions := report.Options{
 		SummaryOnly:         summaryOnly,
-		InputSummary:        inputSummary(base, head, diffFile),
-		InputNotes:          inputNotes(base, head, diffFile),
+		InputSummary:        diffinput.Summary(selection),
+		InputNotes:          diffinput.Notes(selection),
 		AnchorScanAvailable: true,
 		AnchorRuleIDs:       rules.ScanAnchorRuleIDs(diff),
 	}
@@ -142,16 +143,6 @@ func normalizeToolVersion(value string) string {
 	return trimmed
 }
 
-func inputKind(base, head, diffFile string) string {
-	if diffFile != "" {
-		return "diff_file"
-	}
-	if base != "" && head != "" {
-		return "range"
-	}
-	return "working_tree"
-}
-
 func flagWasProvided(flags *flag.FlagSet, name string) bool {
 	provided := false
 	flags.Visit(func(visited *flag.Flag) {
@@ -162,28 +153,7 @@ func flagWasProvided(flags *flag.FlagSet, name string) bool {
 	return provided
 }
 
-func inputSummary(base, head, diffFile string) string {
-	if diffFile != "" {
-		return "diff file"
-	}
-	if base != "" && head != "" {
-		return fmt.Sprintf("git range diff (%s..%s)", base, head)
-	}
-	return "working tree diff (tracked changes)"
-}
-
-func inputNotes(base, head, diffFile string) []string {
-	switch {
-	case diffFile != "":
-		return []string{"only the provided unified diff file was evaluated"}
-	case base != "" && head != "":
-		return []string{"working tree changes are not included in --base/--head mode"}
-	default:
-		return []string{"untracked files are not included unless staged with git add -N"}
-	}
-}
-
-func validateFlags(base, head, diffFile, format, failOn string, summaryOnly, includeExplanations, emitObligations, emitLocalAIReviewImport, formatProvided bool) error {
+func validateFlags(selection diffinput.Selection, format, failOn string, summaryOnly, includeExplanations, emitObligations, emitLocalAIReviewImport, formatProvided bool) error {
 	switch format {
 	case "text", "json", "markdown":
 	default:
@@ -196,11 +166,8 @@ func validateFlags(base, head, diffFile, format, failOn string, summaryOnly, inc
 		return fmt.Errorf("invalid --fail-on %q", failOn)
 	}
 
-	if diffFile != "" && (base != "" || head != "") {
-		return fmt.Errorf("--diff-file cannot be combined with --base/--head")
-	}
-	if (base == "") != (head == "") {
-		return fmt.Errorf("--base and --head must be provided together")
+	if err := diffinput.Validate(selection); err != nil {
+		return err
 	}
 	if emitObligations && summaryOnly {
 		return fmt.Errorf("--emit-obligations cannot be combined with --summary")
@@ -225,32 +192,6 @@ func validateFlags(base, head, diffFile, format, failOn string, summaryOnly, inc
 	}
 
 	return nil
-}
-
-func resolveRoots(ctx context.Context, cwd, diffFile string) (string, string, error) {
-	repoRoot, err := diffsrc.RepoRoot(ctx, cwd)
-	if err != nil {
-		if diffFile != "" {
-			return cwd, cwd, nil
-		}
-		return "", "", err
-	}
-
-	if diffFile != "" {
-		return cwd, repoRoot, nil
-	}
-	return repoRoot, repoRoot, nil
-}
-
-func loadDiff(ctx context.Context, cwd, base, head, diffFile string) ([]byte, error) {
-	switch {
-	case diffFile != "":
-		return diffsrc.DiffFile(cwd, diffFile)
-	case base != "" && head != "":
-		return diffsrc.GitRange(ctx, cwd, base, head)
-	default:
-		return diffsrc.WorkingTree(ctx, cwd)
-	}
 }
 
 func writeError(w io.Writer, message string) int {

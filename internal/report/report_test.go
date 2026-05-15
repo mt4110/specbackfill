@@ -42,6 +42,46 @@ func TestWriteTextSkeleton(t *testing.T) {
 	}
 }
 
+func TestTodoCountLabels(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		count        int
+		wantText     string
+		wantMarkdown string
+	}{
+		{
+			count:        0,
+			wantText:     "0 unresolved obligations",
+			wantMarkdown: "- Unresolved obligations: 0",
+		},
+		{
+			count:        1,
+			wantText:     "1 unresolved obligation",
+			wantMarkdown: "- Unresolved obligation: 1",
+		},
+		{
+			count:        2,
+			wantText:     "2 unresolved obligations",
+			wantMarkdown: "- Unresolved obligations: 2",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.wantText, func(t *testing.T) {
+			t.Parallel()
+
+			if got := todoCountText(tc.count); got != tc.wantText {
+				t.Fatalf("todoCountText(%d) = %q, want %q", tc.count, got, tc.wantText)
+			}
+			if got := todoCountMarkdown(tc.count); got != tc.wantMarkdown {
+				t.Fatalf("todoCountMarkdown(%d) = %q, want %q", tc.count, got, tc.wantMarkdown)
+			}
+		})
+	}
+}
+
 func TestFileSummaryRows(t *testing.T) {
 	t.Parallel()
 

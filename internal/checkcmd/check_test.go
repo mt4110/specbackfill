@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mt4110/specbackfill/internal/diffinput"
 	"github.com/mt4110/specbackfill/internal/model"
 )
 
@@ -118,12 +119,13 @@ func TestInputSummaryAndNotes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := inputSummary(tc.base, tc.head, tc.diffFile); got != tc.wantSummary {
-				t.Fatalf("inputSummary() = %q, want %q", got, tc.wantSummary)
+			selection := diffinput.Selection{Base: tc.base, Head: tc.head, DiffFile: tc.diffFile}
+			if got := diffinput.Summary(selection); got != tc.wantSummary {
+				t.Fatalf("diffinput.Summary() = %q, want %q", got, tc.wantSummary)
 			}
-			notes := inputNotes(tc.base, tc.head, tc.diffFile)
+			notes := diffinput.Notes(selection)
 			if len(notes) != 1 || notes[0] != tc.wantNote {
-				t.Fatalf("inputNotes() = %v, want [%q]", notes, tc.wantNote)
+				t.Fatalf("diffinput.Notes() = %v, want [%q]", notes, tc.wantNote)
 			}
 		})
 	}

@@ -14,7 +14,7 @@ specbackfill は、git diff から「この変更が発生させた **companion 
 - authz 分岐を変えたけど allow/deny test が同じ diff にない
 - worker/retry を変えたけど runbook/observability が同じ diff にない
 
-現状の repository には、`specbackfill check` の v0 MVP、実装済みルールを確認する `specbackfill rules` コマンド、fixture coverage を見る `specbackfill fixtures` コマンド、検証 fixture が入っています。
+現状の repository には、`specbackfill check` の v0 MVP、未解決 obligation を短い次アクションにする `specbackfill todo`、実装済みルールを確認する `specbackfill rules` コマンド、fixture coverage を見る `specbackfill fixtures` コマンド、検証 fixture が入っています。
 
 この README は日本語の主入口です。挙動の正本は [docs/v0-spec.md](./docs/v0-spec.md)、変更時の制約は [AGENTS.md](./AGENTS.md) にあります。
 
@@ -57,6 +57,14 @@ specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
                   [--emit-local-ai-review-import]
 ```
 
+日々の作業で短い action list だけ見たい場合は、次のコマンドを使います。
+
+```bash
+specbackfill todo [--base <ref> --head <ref> | --diff-file <file>]
+                  [--format text|markdown]
+                  [--fail-on error|warn|off]
+```
+
 実装済みルールを確認する場合は、次のコマンドを使います。
 
 ```bash
@@ -77,6 +85,7 @@ specbackfill fixtures report
 - `--explain`: 既存 finding に紐づく grounded explanation を追加します。finding 自体は増やしません。
 - `--emit-obligations`: `schema_version`, `tool`, `run`, `obligations` を持つ `obligations.v1` JSON artifact を出します。`satisfied` の companion evidence と `suppressed` の reason/evidence もこの artifact で確認できます。`--format` は省略するか `--format json` を指定します。
 - `--emit-local-ai-review-import`: `local_ai_review_import.v1` JSONL を出します。各行は deterministic item ID、run ID、rule ID、status、severity、title、diff-local evidence digest、status reason、raw obligation JSON、`source/import_kind` を持ちます。`--format` とは併用しません。
+- `todo`: `check` と同じ rule evaluation を使い、未解決 obligation だけを anchor、missing companion、next action 付きの短い一覧にします。JSON は出しません。
 - JSON findings には deterministic な `finding_id` と `omission_signature` が入ります。
 - 通常の `--format json` は findings 契約です。obligation/status artifact は [schemas/obligations.schema.json](./schemas/obligations.schema.json) に従う別契約です。
 - local-ai-review import JSONL は [schemas/local_ai_review_import.schema.json](./schemas/local_ai_review_import.schema.json) に従う adapter 契約です。
@@ -93,6 +102,7 @@ specbackfill fixtures report
 go install github.com/mt4110/specbackfill/cmd/specbackfill@latest
 specbackfill --version
 specbackfill check --diff-file change.diff --format text --fail-on off
+specbackfill todo --diff-file change.diff --fail-on off
 ```
 
 この repository からローカルに試す場合は、`make install` で `~/.local/bin/specbackfill` に入れられます。
@@ -173,6 +183,7 @@ make patch DIFF=testdata/patches/db001_positive.diff
 make json
 make md
 make summary
+make todo
 make rules
 make rule RULE=DB001
 make fixtures

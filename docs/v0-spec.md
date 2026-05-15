@@ -156,7 +156,38 @@ specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
                   [--emit-local-ai-review-import]
 ```
 
-### 4.2 Rule discovery commands
+### 4.2 Daily action command
+
+v0 MUST support the following action-oriented command:
+
+```bash
+specbackfill todo [--base <ref> --head <ref> | --diff-file <file>]
+                  [--format text|markdown]
+                  [--fail-on error|warn|off]
+```
+
+The `todo` command evaluates the same deterministic companion obligations as
+`specbackfill check`, but renders only unresolved obligations as a compact
+action list. It MUST NOT create findings, change rule evaluation, call network
+services, invoke non-deterministic detection, inspect PR metadata, or mutate
+repository files.
+
+Each unresolved obligation SHOULD include:
+
+- rule ID and severity
+- changed anchor
+- missing companion category scoped to this diff
+- a smallest next action
+
+Common obligations SHOULD fit in fewer than 10 rendered lines. The command MUST
+return exit code `1` using the same `--fail-on` threshold semantics as
+`specbackfill check`.
+
+The `todo` command intentionally does not emit JSON in v0. Machine-readable
+callers SHOULD use `specbackfill check --format json`, `--emit-obligations`, or
+`--emit-local-ai-review-import`.
+
+### 4.3 Rule discovery commands
 
 v0 MUST support the following rule discovery commands:
 
@@ -179,7 +210,7 @@ The `rules` command group returns exit code `0` on success and exit code `2`
 for invalid arguments, unknown rule IDs, or tool errors. It MUST NOT return
 exit code `1` because it does not evaluate findings.
 
-### 4.3 Fixture visibility command
+### 4.4 Fixture visibility command
 
 v0 MAY support the following repository-maintainer command:
 
@@ -195,7 +226,7 @@ emit findings, inspect PR metadata, call network services, invoke AI, or change
 `fixtures report` SHOULD show positive, companion-present, negative, and edge
 fixture counts by rule.
 
-### 4.4 Input sources
+### 4.5 Input sources
 
 | Input source | When used | Requirement |
 | --- | --- | --- |
@@ -205,7 +236,7 @@ fixture counts by rule.
 
 The implementation MAY reject invalid combinations of input flags as tool errors.
 
-### 4.5 Output formats
+### 4.6 Output formats
 
 v0 MUST support the following formats:
 
@@ -239,7 +270,7 @@ It MUST NOT change rule evaluation or exit-code threshold behavior.
 It MUST NOT be combined with `--format`, `--summary`, `--explain`, or
 `--emit-obligations`.
 
-### 4.6 Severity threshold
+### 4.7 Severity threshold
 
 v0 MUST support the following `--fail-on` modes:
 
@@ -251,7 +282,7 @@ v0 MUST support the following `--fail-on` modes:
 
 `info` findings MUST NOT cause exit code `1`.
 
-### 4.7 Exit codes
+### 4.8 Exit codes
 
 The command MUST return:
 
@@ -269,7 +300,7 @@ Tool errors include, but are not limited to:
 - git invocation failures for local/git-range diff acquisition
 - unexpected internal failures
 
-### 4.8 CI usage
+### 4.9 CI usage
 
 CI systems SHOULD invoke the same `specbackfill check` CLI contract used locally.
 

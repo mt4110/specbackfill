@@ -1,0 +1,6 @@
+specbackfill todo
+input: diff file
+note: only the provided unified diff file was evaluated
+0 unresolved obligations
+No next actions from implemented v0 rules.
+This does not prove the diff is complete.

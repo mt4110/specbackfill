@@ -1,0 +1,13 @@
+specbackfill todo
+input: diff file
+note: only the provided unified diff file was evaluated
+2 unresolved obligations
+[warn] API001 public API -> contract/docs
+Anchor: openapi.yaml +2: /users:
+Missing: contract test, API docs, or compatibility note companion did not move in this diff
+Next: add/update contract tests, API docs, or compatibility/deprecation notes
+
+[warn] ERR001 error/status -> assertion/docs
+Anchor: internal/http/handler.go -2: return http.StatusBadRequest
+Missing: assertion test, API note, or client note companion did not move in this diff
+Next: add/update assertion coverage or document the public error/status change

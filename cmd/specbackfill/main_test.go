@@ -43,6 +43,29 @@ func TestRunPrintsVersion(t *testing.T) {
 	}
 }
 
+func TestRunDispatchesTodoCommand(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run(context.Background(), []string{
+		"todo",
+		"--diff-file", "../../testdata/patches/db001_positive.diff",
+		"--fail-on", "off",
+	}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run(todo) code = %d, want 0; stderr=%q", code, stderr.String())
+	}
+	if stderr.String() != "" {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	for _, want := range []string{"specbackfill todo", "[error] DB001", "Next:"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("todo output missing %q:\n%s", want, stdout.String())
+		}
+	}
+}
+
 func TestRunRejectsVersionArguments(t *testing.T) {
 	t.Parallel()
 
@@ -115,6 +138,9 @@ func TestRunRejectsUnknownTopLevelCommand(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "specbackfill rules list") {
 		t.Fatalf("stderr missing usage:\n%s", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "specbackfill todo [flags]") {
+		t.Fatalf("stderr missing todo usage:\n%s", stderr.String())
 	}
 }
 

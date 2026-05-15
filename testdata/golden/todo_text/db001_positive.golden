@@ -1,0 +1,8 @@
+specbackfill todo
+input: diff file
+note: only the provided unified diff file was evaluated
+1 unresolved obligation
+[error] DB001 schema -> migration
+Anchor: schema.prisma +3: email String @unique
+Missing: migration file companion did not move in this diff
+Next: add a matching migration file, or record why this diff intentionally has no migration companion

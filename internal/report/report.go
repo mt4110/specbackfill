@@ -588,6 +588,254 @@ func WriteLocalAIReviewImport(w io.Writer, items []model.LocalAIReviewImportItem
 	return nil
 }
 
+func WriteTodo(w io.Writer, format string, obligations []model.Obligation, options Options) error {
+	switch format {
+	case "text":
+		return writeTextTodo(w, obligations, options)
+	case "markdown":
+		return writeMarkdownTodo(w, obligations, options)
+	default:
+		return fmt.Errorf("unsupported format %q", format)
+	}
+}
+
+func writeTextTodo(w io.Writer, obligations []model.Obligation, options Options) error {
+	missing := missingObligations(obligations)
+	if _, err := fmt.Fprintln(w, "specbackfill todo"); err != nil {
+		return err
+	}
+	if err := writeTextInputSummary(w, options); err != nil {
+		return err
+	}
+	count := len(missing)
+	if _, err := fmt.Fprintln(w, todoCountText(count)); err != nil {
+		return err
+	}
+	if count == 0 {
+		if _, err := fmt.Fprintln(w, "No next actions from implemented v0 rules."); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintln(w, "This does not prove the diff is complete.")
+		return err
+	}
+
+	for index, obligation := range missing {
+		if index > 0 {
+			if _, err := fmt.Fprintln(w); err != nil {
+				return err
+			}
+		}
+		item := todoItemForObligation(obligation)
+		if _, err := fmt.Fprintf(w, "[%s] %s %s\n", obligation.Severity, obligation.RuleID, item.relation); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "Anchor: %s\n", item.anchor); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "Missing: %s\n", item.missing); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "Next: %s\n", item.next); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeMarkdownTodo(w io.Writer, obligations []model.Obligation, options Options) error {
+	missing := missingObligations(obligations)
+	if _, err := fmt.Fprintln(w, "### specbackfill todo"); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(w); err != nil {
+		return err
+	}
+	if err := writeMarkdownInputSummary(w, options); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(w, todoCountMarkdown(len(missing))); err != nil {
+		return err
+	}
+	if len(missing) == 0 {
+		if _, err := fmt.Fprintln(w, "\nNo next actions from implemented v0 rules."); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintln(w, "\nThis does not prove the diff is complete.")
+		return err
+	}
+
+	for _, obligation := range missing {
+		item := todoItemForObligation(obligation)
+		if _, err := fmt.Fprintf(w, "\n#### [%s] %s %s\n\n", obligation.Severity, obligation.RuleID, item.relation); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "- Anchor: %s\n", markdownCode(item.anchor)); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "- Missing: %s\n", item.missing); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "- Next: %s\n", item.next); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func missingObligations(obligations []model.Obligation) []model.Obligation {
+	missing := make([]model.Obligation, 0, len(obligations))
+	for _, obligation := range obligations {
+		if obligation.Status == model.ObligationStatusMissing {
+			missing = append(missing, obligation)
+		}
+	}
+	return missing
+}
+
+func todoCountText(count int) string {
+	if count == 1 {
+		return "1 unresolved obligation"
+	}
+	return fmt.Sprintf("%d unresolved obligations", count)
+}
+
+func todoCountMarkdown(count int) string {
+	label := "Unresolved obligations"
+	if count == 1 {
+		label = "Unresolved obligation"
+	}
+	return fmt.Sprintf("- %s: %d", label, count)
+}
+
+type todoItem struct {
+	relation string
+	anchor   string
+	missing  string
+	next     string
+}
+
+func todoItemForObligation(obligation model.Obligation) todoItem {
+	copy := todoCopyForRule(obligation.RuleID)
+	return todoItem{
+		relation: copy.relation,
+		anchor:   todoAnchor(obligation),
+		missing:  copy.missing,
+		next:     copy.next,
+	}
+}
+
+type todoCopy struct {
+	relation string
+	missing  string
+	next     string
+}
+
+func todoCopyForRule(ruleID string) todoCopy {
+	switch ruleID {
+	case "DB001":
+		return todoCopy{
+			relation: "schema -> migration",
+			missing:  "migration file companion did not move in this diff",
+			next:     "add a matching migration file, or record why this diff intentionally has no migration companion",
+		}
+	case "DB002":
+		return todoCopy{
+			relation: "destructive storage -> rollback/backfill",
+			missing:  "rollback, backfill, or compatibility companion did not move in this diff",
+			next:     "add rollback/backfill notes or compatibility coverage, or record why this diff intentionally has none",
+		}
+	case "API001":
+		return todoCopy{
+			relation: "public API -> contract/docs",
+			missing:  "contract test, API docs, or compatibility note companion did not move in this diff",
+			next:     "add/update contract tests, API docs, or compatibility/deprecation notes",
+		}
+	case "CFG001":
+		return todoCopy{
+			relation: "config/env -> docs/default",
+			missing:  "docs, default handling, or upgrade note companion did not move in this diff",
+			next:     "add/update docs, defaults, or upgrade notes for the new config surface",
+		}
+	case "AUTH001":
+		return todoCopy{
+			relation: "authz -> allow/deny evidence",
+			missing:  "allow/deny test or security-sensitive note companion did not move in this diff",
+			next:     "add allow/deny coverage or a security-sensitive note tied to the auth change",
+		}
+	case "ERR001":
+		return todoCopy{
+			relation: "error/status -> assertion/docs",
+			missing:  "assertion test, API note, or client note companion did not move in this diff",
+			next:     "add/update assertion coverage or document the public error/status change",
+		}
+	case "OPS001":
+		return todoCopy{
+			relation: "worker/retry -> runbook/observability",
+			missing:  "runbook, observability, or rollback companion did not move in this diff",
+			next:     "add/update runbook, alerting/observability notes, or rollback guidance",
+		}
+	case "DOC001":
+		return todoCopy{
+			relation: "generated spec -> human explanation",
+			missing:  "human-facing docs or upgrade note companion did not move in this diff",
+			next:     "add/update human-facing explanation for the generated spec/client change",
+		}
+	default:
+		return todoCopy{
+			relation: "change -> companion work",
+			missing:  "expected companion evidence did not move in this diff",
+			next:     "add/update the companion artifact, or record why this diff intentionally has none",
+		}
+	}
+}
+
+func todoAnchor(obligation model.Obligation) string {
+	evidence := firstTodoEvidence(obligation)
+	if evidence.File == "" {
+		if obligation.Anchor.Path != "" {
+			return obligation.Anchor.Path
+		}
+		return "unknown diff evidence"
+	}
+
+	location := evidence.File
+	marker := todoLineMarker(evidence.Kind)
+	if evidence.Line > 0 && marker != "" {
+		location = fmt.Sprintf("%s %s%d", location, marker, evidence.Line)
+	} else if evidence.Line > 0 {
+		location = fmt.Sprintf("%s %d", location, evidence.Line)
+	}
+
+	excerpt := strings.TrimSpace(evidence.Excerpt)
+	if excerpt == "" {
+		return location
+	}
+	return fmt.Sprintf("%s: %s", location, excerpt)
+}
+
+func firstTodoEvidence(obligation model.Obligation) model.Evidence {
+	if len(obligation.Anchor.Evidence) > 0 {
+		return obligation.Anchor.Evidence[0]
+	}
+	if len(obligation.Evidence) > 0 {
+		return obligation.Evidence[0]
+	}
+	return model.Evidence{}
+}
+
+func todoLineMarker(kind string) string {
+	switch kind {
+	case string(model.LineKindAdded):
+		return "+"
+	case string(model.LineKindRemoved):
+		return "-"
+	case string(model.LineKindContext):
+		return "~"
+	default:
+		return ""
+	}
+}
+
 func writeMarkdown(w io.Writer, diff model.Diff, result model.Report, options Options) error {
 	if _, err := fmt.Fprintln(w, "### specbackfill findings"); err != nil {
 		return err
