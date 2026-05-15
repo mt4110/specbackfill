@@ -106,7 +106,8 @@
       ]
     },
     "was_actioned": {
-      "$ref": "#/$defs/csv_boolean"
+      "$ref": "#/$defs/csv_boolean",
+      "description": "True only when operator_verdict is useful_fixed. useful_fixed rows must set this true."
     },
     "duplicate_with_local_ai_review": {
       "$ref": "#/$defs/csv_boolean",
@@ -130,7 +131,56 @@
       "description": "Short public-safe note. Do not include raw private review text, private diff excerpts, URLs, email-like values, secrets, or proprietary identifiers."
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "operator_verdict"
+        ],
+        "properties": {
+          "operator_verdict": {
+            "const": "useful_fixed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "was_actioned": {
+            "$ref": "#/$defs/csv_true"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "was_actioned"
+        ],
+        "properties": {
+          "was_actioned": {
+            "$ref": "#/$defs/csv_true"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "operator_verdict": {
+            "const": "useful_fixed"
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
+    "csv_true": {
+      "enum": [
+        true,
+        "1",
+        "true",
+        "yes",
+        "y"
+      ]
+    },
     "csv_boolean": {
       "oneOf": [
         {

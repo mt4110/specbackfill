@@ -1,10 +1,10 @@
 # specbackfill Pilot Decision Record v2
 
-This template is for a public-safe Week 3 real pilot decision after evaluating
-`pilot_scorecard.v1` rows. Keep real pilot scorecards, raw private diffs,
-private PR titles, descriptions, bodies, comments, private review text,
-personal data, secrets, and proprietary repository names out of the public
-repository.
+This template is for a public-safe real pilot, Week 7 beta dogfood, or Week 8
+final decision after evaluating `pilot_scorecard.v1` rows. Keep real pilot
+scorecards, raw private diffs, private PR titles, descriptions, bodies,
+comments, private review text, personal data, secrets, and proprietary
+repository names out of the public repository.
 
 If no real pilot data exists, set `Pilot status` to `not_run`, set `Decision`
 to `pending`, and leave metrics as `TBD`. Do not infer or invent numbers from
@@ -42,6 +42,7 @@ synthetic samples.
 | sample refs | TBD |
 | repositories/corpora | TBD |
 | local-ai-review import exercised | yes/no/TBD |
+| human action caused by useful obligation | yes/no/TBD |
 | suppression iterations | TBD |
 
 ## Metrics
@@ -50,8 +51,10 @@ synthetic samples.
 | --- | ---: | ---: |
 | useful count | TBD | >= 5 |
 | useful rate | TBD | >= 20% |
-| actioned count | TBD | informational / >= 10 for beta |
+| actioned count | TBD | informational |
 | actioned rate | TBD | informational |
+| useful actioned count | TBD | >= 1 for beta / >= 10 for blocking consideration |
+| useful actioned rate | TBD | informational |
 | false positive count | TBD | informational |
 | false positive rate | TBD | <= 25% |
 | hard blocker false positive count | TBD | informational |
@@ -61,6 +64,26 @@ synthetic samples.
 | evidence coverage | TBD | >= 95% |
 | stable deterministic IDs | TBD | 100% |
 | status reason coverage | TBD | >= 90% |
+
+## Week 7 Beta Dogfood Checks
+
+Copy these from the `week 7 beta dogfood checks`, `beta threshold checks`, and
+`beta blocking consideration auto-checks` sections of `scripts/evaluate_pilot.py`.
+Do not mark beta-ready from synthetic rows or unevaluated intuition.
+A beta decision also requires the `Threshold Checks` section above to pass.
+
+| Check | Value |
+| --- | --- |
+| 60+ scorecard rows | pass/fail/TBD |
+| 3+ repositories/corpora | pass/fail/TBD |
+| local-ai-review import exercised | pass/fail/TBD |
+| at least one useful human action | pass/fail/TBD |
+| useful rate >= 25% | pass/fail/TBD |
+| false positive rate <= 20% | pass/fail/TBD |
+| error-severity false positive rate <= 5% | pass/fail/TBD |
+| 10+ useful actioned rows for blocking consideration | pass/fail/TBD |
+| no high-severity privacy/release gaps | manual pass/fail/TBD |
+| release artifact/install smoke | manual pass/fail/TBD |
 
 ## Threshold Checks
 

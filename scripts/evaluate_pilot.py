@@ -242,6 +242,10 @@ def validate_row(row: dict[str, str], row_number: int) -> None:
         bools["duplicate_with_local_ai_review"] or bools["duplicate_with_review_firewall"]
     ):
         raise ValueError(f"row {row_number}: duplicate flags require the matching duplicate operator_verdict")
+    if verdict == "useful_fixed" and not bools["was_actioned"]:
+        raise ValueError(f"row {row_number}: useful_fixed rows require was_actioned=true")
+    if bools["was_actioned"] and verdict != "useful_fixed":
+        raise ValueError(f"row {row_number}: was_actioned=true requires operator_verdict=useful_fixed")
     if len(row.get("notes") or "") > 240:
         raise ValueError(f"row {row_number}: notes must be 240 characters or fewer")
     validate_public_safe_notes(row.get("notes") or "", row_number)
@@ -278,6 +282,10 @@ def evaluate(rows: list[dict[str, str]], args: argparse.Namespace) -> tuple[str,
     useful = sum(verdicts[verdict] for verdict in USEFUL_VERDICTS)
     false_positive = verdicts[FALSE_POSITIVE]
     actioned = sum(1 for row in rows if bool_value(row, "was_actioned"))
+    # `validate_row()` currently constrains actioned rows to the useful-fixed
+    # verdict, so this metric is intentionally kept as an alias of `actioned`
+    # for compatibility with downstream reporting.
+    useful_actioned = actioned
     duplicate_local_ai_review = count_duplicate_rows(
         rows, DUPLICATE_LOCAL_AI_REVIEW, "duplicate_with_local_ai_review"
     )
@@ -332,6 +340,24 @@ def evaluate(rows: list[dict[str, str]], args: argparse.Namespace) -> tuple[str,
         "local_ai_review_import_path": local_ai_review_import_ok,
     }
 
+    week7_beta_dogfood_checks = {
+        "rows_60": total >= 60,
+        "repositories_or_corpora_3": len(source_labels) >= 3,
+        "local_ai_review_import_path": local_ai_review_import_ok,
+        "useful_human_action": useful_actioned >= 1,
+    }
+    beta_threshold_checks = {
+        **continue_checks,
+        **week7_beta_dogfood_checks,
+        "useful_rate_25": useful_rate >= 0.25,
+        "false_positive_rate_20": false_positive_rate <= 0.20,
+        "error_severity_false_positive_rate_5": hard_blocker_false_positive_rate <= 0.05,
+    }
+    beta_blocking_consideration_checks = {
+        **beta_threshold_checks,
+        "useful_actioned_rows_10": useful_actioned >= 10,
+    }
+
     archive_reasons = []
     if fair_sample and useful == 0:
         archive_reasons.append("AR-01: zero useful obligations after fair sample")
@@ -367,6 +393,8 @@ def evaluate(rows: list[dict[str, str]], args: argparse.Namespace) -> tuple[str,
         "false_positive_rate": false_positive_rate,
         "actioned": actioned,
         "actioned_rate": rate(actioned, total),
+        "useful_actioned": useful_actioned,
+        "useful_actioned_rate": rate(useful_actioned, total),
         "hard_blocker_false_positive": hard_blocker_false_positive,
         "hard_blocker_false_positive_rate": hard_blocker_false_positive_rate,
         "duplicate_with_local_ai_review": duplicate_local_ai_review,
@@ -384,6 +412,14 @@ def evaluate(rows: list[dict[str, str]], args: argparse.Namespace) -> tuple[str,
         "rules": rules,
         "fp_reasons": fp_reasons,
         "continue_checks": continue_checks,
+        "week7_beta_dogfood_checks": week7_beta_dogfood_checks,
+        "week7_beta_dogfood_ready": all(week7_beta_dogfood_checks.values()),
+        "beta_threshold_checks": beta_threshold_checks,
+        "beta_thresholds_pass": all(beta_threshold_checks.values()),
+        "beta_blocking_consideration_checks": beta_blocking_consideration_checks,
+        "beta_blocking_consideration_auto_checks_pass": all(
+            beta_blocking_consideration_checks.values()
+        ),
         "archive_reasons": archive_reasons,
     }
     return decision, metrics
@@ -402,6 +438,7 @@ def print_report(decision: str, metrics: dict[str, object]) -> None:
     print("## metrics")
     print(f"useful: {metrics['useful']} ({metrics['useful_rate']:.1%})")
     print(f"actioned: {metrics['actioned']} ({metrics['actioned_rate']:.1%})")
+    print(f"useful_actioned: {metrics['useful_actioned']} ({metrics['useful_actioned_rate']:.1%})")
     print(f"false_positive: {metrics['false_positive']} ({metrics['false_positive_rate']:.1%})")
     print(
         "hard_blocker_false_positive: "
@@ -427,6 +464,28 @@ def print_report(decision: str, metrics: dict[str, object]) -> None:
     for name, passed in metrics["continue_checks"].items():
         label = "pass" if passed else "fail"
         print(f"- {name}: {label}")
+    print()
+    print("## week 7 beta dogfood checks")
+    for name, passed in metrics["week7_beta_dogfood_checks"].items():
+        label = "pass" if passed else "fail"
+        print(f"- {name}: {label}")
+    print(f"week7_beta_dogfood_ready: {str(metrics['week7_beta_dogfood_ready']).lower()}")
+    print()
+    print("## beta threshold checks")
+    for name, passed in metrics["beta_threshold_checks"].items():
+        label = "pass" if passed else "fail"
+        print(f"- {name}: {label}")
+    print(f"beta_thresholds_pass: {str(metrics['beta_thresholds_pass']).lower()}")
+    print()
+    print("## beta blocking consideration auto-checks")
+    for name, passed in metrics["beta_blocking_consideration_checks"].items():
+        label = "pass" if passed else "fail"
+        print(f"- {name}: {label}")
+    print(
+        "beta_blocking_consideration_auto_checks_pass: "
+        f"{str(metrics['beta_blocking_consideration_auto_checks_pass']).lower()}"
+    )
+    print("manual_checks_required: no high-severity privacy/release gaps; release artifact/install smoke")
     print()
     print("## verdicts")
     for key, value in metrics["verdicts"].most_common():
