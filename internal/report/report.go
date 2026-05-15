@@ -608,11 +608,7 @@ func writeTextTodo(w io.Writer, obligations []model.Obligation, options Options)
 		return err
 	}
 	count := len(missing)
-	obligationLabel := "obligations"
-	if count == 1 {
-		obligationLabel = "obligation"
-	}
-	if _, err := fmt.Fprintf(w, "%d unresolved %s\n", count, obligationLabel); err != nil {
+	if _, err := fmt.Fprintln(w, todoCountText(count)); err != nil {
 		return err
 	}
 	if count == 0 {
@@ -657,7 +653,7 @@ func writeMarkdownTodo(w io.Writer, obligations []model.Obligation, options Opti
 	if err := writeMarkdownInputSummary(w, options); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "- Unresolved obligations: %d\n", len(missing)); err != nil {
+	if _, err := fmt.Fprintln(w, todoCountMarkdown(len(missing))); err != nil {
 		return err
 	}
 	if len(missing) == 0 {
@@ -694,6 +690,21 @@ func missingObligations(obligations []model.Obligation) []model.Obligation {
 		}
 	}
 	return missing
+}
+
+func todoCountText(count int) string {
+	if count == 1 {
+		return "1 unresolved obligation"
+	}
+	return fmt.Sprintf("%d unresolved obligations", count)
+}
+
+func todoCountMarkdown(count int) string {
+	label := "Unresolved obligations"
+	if count == 1 {
+		label = "Unresolved obligation"
+	}
+	return fmt.Sprintf("- %s: %d", label, count)
 }
 
 type todoItem struct {

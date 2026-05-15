@@ -2,7 +2,7 @@
 
 - Input: diff file
 - Note: only the provided unified diff file was evaluated
-- Unresolved obligations: 1
+- Unresolved obligation: 1
 
 #### [error] DB001 schema -> migration
 
