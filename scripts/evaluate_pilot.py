@@ -282,12 +282,10 @@ def evaluate(rows: list[dict[str, str]], args: argparse.Namespace) -> tuple[str,
     useful = sum(verdicts[verdict] for verdict in USEFUL_VERDICTS)
     false_positive = verdicts[FALSE_POSITIVE]
     actioned = sum(1 for row in rows if bool_value(row, "was_actioned"))
-    useful_actioned = sum(
-        1
-        for row in rows
-        if bool_value(row, "was_actioned")
-        and (row.get("operator_verdict") or "").strip() in USEFUL_VERDICTS
-    )
+    # `validate_row()` currently constrains actioned rows to the useful-fixed
+    # verdict, so this metric is intentionally kept as an alias of `actioned`
+    # for compatibility with downstream reporting.
+    useful_actioned = actioned
     duplicate_local_ai_review = count_duplicate_rows(
         rows, DUPLICATE_LOCAL_AI_REVIEW, "duplicate_with_local_ai_review"
     )
