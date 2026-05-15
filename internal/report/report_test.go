@@ -665,8 +665,9 @@ func TestLocalAIReviewImportSchemaDocumentsRequiredFields(t *testing.T) {
 	}
 
 	var schema struct {
-		Properties map[string]any `json:"properties"`
-		Required   []string       `json:"required"`
+		Properties map[string]json.RawMessage `json:"properties"`
+		Required   []string                   `json:"required"`
+		Defs       map[string]json.RawMessage `json:"$defs"`
 	}
 	if err := json.Unmarshal(raw, &schema); err != nil {
 		t.Fatalf("json.Unmarshal(schema) error = %v", err)
@@ -684,8 +685,6 @@ func TestLocalAIReviewImportSchemaDocumentsRequiredFields(t *testing.T) {
 		"title",
 		"diff_local_claim",
 		"evidence_digest",
-		"status_reason",
-		"raw_json",
 	} {
 		if !containsString(schema.Required, field) {
 			t.Fatalf("schema required fields missing %q: %v", field, schema.Required)
@@ -693,6 +692,44 @@ func TestLocalAIReviewImportSchemaDocumentsRequiredFields(t *testing.T) {
 		if _, ok := schema.Properties[field]; !ok {
 			t.Fatalf("schema properties missing %q", field)
 		}
+	}
+	for _, field := range []string{"status_reason", "raw_json"} {
+		if containsString(schema.Required, field) {
+			t.Fatalf("schema must keep additive v1 field %q optional for backward compatibility: %v", field, schema.Required)
+		}
+		if _, ok := schema.Properties[field]; !ok {
+			t.Fatalf("schema properties missing additive producer field %q", field)
+		}
+	}
+
+	var rawJSONProperty struct {
+		Ref string `json:"$ref"`
+	}
+	if err := json.Unmarshal(schema.Properties["raw_json"], &rawJSONProperty); err != nil {
+		t.Fatalf("json.Unmarshal(raw_json property) error = %v", err)
+	}
+	if rawJSONProperty.Ref != "#/$defs/obligation" {
+		t.Fatalf("raw_json schema ref = %q, want #/$defs/obligation", rawJSONProperty.Ref)
+	}
+
+	var obligationDef struct {
+		Required             []string       `json:"required"`
+		Properties           map[string]any `json:"properties"`
+		AdditionalProperties *bool          `json:"additionalProperties"`
+	}
+	if err := json.Unmarshal(schema.Defs["obligation"], &obligationDef); err != nil {
+		t.Fatalf("json.Unmarshal(obligation def) error = %v", err)
+	}
+	for _, field := range []string{"finding_id", "omission_signature", "anchor", "required_companions", "downstream"} {
+		if !containsString(obligationDef.Required, field) {
+			t.Fatalf("raw_json obligation schema missing required field %q: %v", field, obligationDef.Required)
+		}
+		if _, ok := obligationDef.Properties[field]; !ok {
+			t.Fatalf("raw_json obligation schema properties missing %q", field)
+		}
+	}
+	if obligationDef.AdditionalProperties == nil || *obligationDef.AdditionalProperties {
+		t.Fatalf("raw_json obligation schema must close additional properties")
 	}
 }
 
@@ -730,6 +767,11 @@ func TestLocalAIReviewImportGoldensContainSchemaRequiredFields(t *testing.T) {
 				for _, field := range required {
 					if _, ok := decoded[field]; !ok {
 						t.Fatalf("golden %s missing required field %q\nline=%s", entry.Name(), field, line)
+					}
+				}
+				for _, field := range []string{"status_reason", "raw_json"} {
+					if _, ok := decoded[field]; !ok {
+						t.Fatalf("golden %s missing emitted producer field %q\nline=%s", entry.Name(), field, line)
 					}
 				}
 

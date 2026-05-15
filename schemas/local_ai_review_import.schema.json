@@ -29,9 +29,7 @@
     "anchor",
     "required_companions",
     "evidence",
-    "status_reason",
-    "suppression",
-    "raw_json"
+    "suppression"
   ],
   "properties": {
     "schema_version": {
@@ -220,81 +218,8 @@
       "additionalProperties": false
     },
     "raw_json": {
-      "type": "object",
       "description": "The raw normalized obligations.v1 obligation object that this import item was derived from.",
-      "required": [
-        "obligation_id",
-        "rule_id",
-        "rule_version",
-        "status",
-        "severity",
-        "confidence",
-        "title",
-        "why",
-        "diff_local_claim",
-        "anchor",
-        "required_companions",
-        "evidence",
-        "suppression",
-        "downstream"
-      ],
-      "properties": {
-        "obligation_id": {
-          "type": "string"
-        },
-        "rule_id": {
-          "type": "string"
-        },
-        "rule_version": {
-          "type": "string"
-        },
-        "status": {
-          "$ref": "#/$defs/status"
-        },
-        "severity": {
-          "type": "string",
-          "enum": [
-            "error",
-            "warn",
-            "info"
-          ]
-        },
-        "confidence": {
-          "type": "string",
-          "enum": [
-            "high",
-            "medium",
-            "low"
-          ]
-        },
-        "title": {
-          "type": "string"
-        },
-        "why": {
-          "type": "string"
-        },
-        "diff_local_claim": {
-          "const": true
-        },
-        "anchor": {
-          "type": "object"
-        },
-        "required_companions": {
-          "type": "array"
-        },
-        "evidence": {
-          "type": "array"
-        },
-        "suppression": {
-          "type": [
-            "object",
-            "null"
-          ]
-        },
-        "downstream": {
-          "type": "object"
-        }
-      }
+      "$ref": "#/$defs/obligation"
     },
     "suppression": {
       "type": [
@@ -332,9 +257,6 @@
         ]
       },
       "then": {
-        "required": [
-          "status_reason"
-        ],
         "properties": {
           "status_reason": {
             "type": "object",
@@ -383,9 +305,6 @@
         ]
       },
       "then": {
-        "required": [
-          "status_reason"
-        ],
         "properties": {
           "status_reason": {
             "type": "object",
@@ -420,6 +339,321 @@
     }
   ],
   "$defs": {
+    "obligation": {
+      "type": "object",
+      "required": [
+        "obligation_id",
+        "finding_id",
+        "omission_signature",
+        "rule_id",
+        "rule_version",
+        "status",
+        "severity",
+        "confidence",
+        "title",
+        "why",
+        "diff_local_claim",
+        "anchor",
+        "required_companions",
+        "evidence",
+        "suppression",
+        "downstream"
+      ],
+      "properties": {
+        "obligation_id": {
+          "type": "string"
+        },
+        "finding_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "omission_signature": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rule_id": {
+          "type": "string"
+        },
+        "rule_version": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warn",
+            "info"
+          ]
+        },
+        "confidence": {
+          "type": "string",
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "why": {
+          "type": "string"
+        },
+        "diff_local_claim": {
+          "const": true
+        },
+        "anchor": {
+          "$ref": "#/$defs/obligation_anchor"
+        },
+        "required_companions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/obligation_required_companion"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "status_reason": {
+          "type": "object",
+          "required": [
+            "reason",
+            "evidence"
+          ],
+          "properties": {
+            "reason": {
+              "$ref": "#/$defs/status_reason"
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/evidence"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "suppression": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "reason": {
+              "$ref": "#/$defs/suppression_reason"
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/evidence"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "downstream": {
+          "$ref": "#/$defs/downstream"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "satisfied"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "status_reason"
+            ],
+            "properties": {
+              "status_reason": {
+                "properties": {
+                  "reason": {
+                    "const": "companion_present"
+                  },
+                  "evidence": {
+                    "minItems": 1
+                  }
+                }
+              },
+              "required_companions": {
+                "items": {
+                  "required": [
+                    "status",
+                    "satisfiers",
+                    "satisfier_evidence"
+                  ],
+                  "properties": {
+                    "status": {
+                      "const": "satisfied"
+                    },
+                    "satisfiers": {
+                      "minItems": 1
+                    },
+                    "satisfier_evidence": {
+                      "minItems": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "suppressed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "status_reason"
+            ],
+            "properties": {
+              "status_reason": {
+                "properties": {
+                  "reason": {
+                    "$ref": "#/$defs/suppression_reason"
+                  },
+                  "evidence": {
+                    "minItems": 1
+                  }
+                }
+              },
+              "suppression": {
+                "type": "object",
+                "required": [
+                  "reason",
+                  "evidence"
+                ],
+                "properties": {
+                  "reason": {
+                    "$ref": "#/$defs/suppression_reason"
+                  },
+                  "evidence": {
+                    "minItems": 1
+                  }
+                }
+              },
+              "required_companions": {
+                "items": {
+                  "properties": {
+                    "status": {
+                      "const": "suppressed"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "obligation_anchor": {
+      "type": "object",
+      "required": [
+        "kind",
+        "path",
+        "line",
+        "evidence"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "line": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "obligation_required_companion": {
+      "type": "object",
+      "required": [
+        "kind",
+        "status",
+        "satisfiers",
+        "expected_paths"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "satisfiers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "satisfier_evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "expected_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "downstream": {
+      "type": "object",
+      "required": [
+        "import_kind",
+        "source_signal"
+      ],
+      "properties": {
+        "import_kind": {
+          "const": "deterministic_static_layer"
+        },
+        "source_signal": {
+          "const": "specbackfill"
+        }
+      },
+      "additionalProperties": false
+    },
     "status": {
       "type": "string",
       "enum": [
