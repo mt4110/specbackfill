@@ -14,7 +14,7 @@ It catches the boring review comments teams keep repeating, using only the diff:
 - authz logic changed, but no allow/deny test moved in the same diff
 - worker/retry behavior changed, but no runbook/observability companion moved in the same diff
 
-The current repository contains the `specbackfill check` v0 MVP, the `specbackfill rules` command for inspecting implemented rules, the `specbackfill fixtures` command for fixture coverage, and verification fixtures.
+The current repository contains the `specbackfill check` v0 MVP, `specbackfill todo` for compact next actions, the `specbackfill rules` command for inspecting implemented rules, the `specbackfill fixtures` command for fixture coverage, and verification fixtures.
 
 This README is the English counterpart to the Japanese primary entry point. The behavioral source of truth is [docs/v0-spec.md](./docs/v0-spec.md), and contributor constraints live in [AGENTS.md](./AGENTS.md).
 
@@ -57,6 +57,14 @@ specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
                   [--emit-local-ai-review-import]
 ```
 
+For a shorter daily action list, use:
+
+```bash
+specbackfill todo [--base <ref> --head <ref> | --diff-file <file>]
+                  [--format text|markdown]
+                  [--fail-on error|warn|off]
+```
+
 To inspect the implemented rules:
 
 ```bash
@@ -77,6 +85,7 @@ specbackfill fixtures report
 - `--explain`: adds grounded explanations tied to existing findings. It does not add findings.
 - `--emit-obligations`: emits an `obligations.v1` JSON artifact with `schema_version`, `tool`, `run`, and `obligations`. The artifact also exposes companion evidence for `satisfied` obligations and reason/evidence for `suppressed` obligations. Omit `--format` or use `--format json`.
 - `--emit-local-ai-review-import`: emits `local_ai_review_import.v1` JSONL. Each line has deterministic item ID, run ID, rule ID, status, severity, title, diff-local evidence digest, status reason, raw obligation JSON, and `source/import_kind`. Do not combine it with `--format`.
+- `todo`: uses the same rule evaluation as `check`, then renders only unresolved obligations as a short list with anchor, missing companion, and next action. It does not emit JSON.
 - JSON findings include deterministic `finding_id` and `omission_signature` fields.
 - Normal `--format json` is the findings contract. The obligation/status artifact is a separate contract described by [schemas/obligations.schema.json](./schemas/obligations.schema.json).
 - The local-ai-review import JSONL adapter contract is described by [schemas/local_ai_review_import.schema.json](./schemas/local_ai_review_import.schema.json).
@@ -93,6 +102,7 @@ As a user, install the CLI with `go install`:
 go install github.com/mt4110/specbackfill/cmd/specbackfill@latest
 specbackfill --version
 specbackfill check --diff-file change.diff --format text --fail-on off
+specbackfill todo --diff-file change.diff --fail-on off
 ```
 
 When trying the local checkout, `make install` installs the command to `~/.local/bin/specbackfill`:
@@ -173,6 +183,7 @@ make patch DIFF=testdata/patches/db001_positive.diff
 make json
 make md
 make summary
+make todo
 make rules
 make rule RULE=DB001
 make fixtures

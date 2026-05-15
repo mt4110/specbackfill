@@ -225,3 +225,38 @@ Required behavior:
 6. If downstream data from `local-ai-review` is used for rule calibration, commit only public-safe summaries, fixtures, and design rationale outside `.private_docs/`.
 
 A change that ignores `.private_docs/` is incomplete even if `go test ./...` passes.
+
+## 14. Business/productization lock
+
+If `.private_docs/specbackfill_business_product_year_pack_v1/.agent/` exists, read it before any implementation, output, rule, schema, documentation, marketing, pricing, integration, or roadmap change.
+
+Required files:
+
+1. `.private_docs/specbackfill_business_product_year_pack_v1/.agent/00_READ_FIRST.md`
+2. `.private_docs/specbackfill_business_product_year_pack_v1/.agent/01_PRODUCT_IDENTITY_LOCK.md`
+3. `.private_docs/specbackfill_business_product_year_pack_v1/.agent/02_CUSTOMER_AND_PAIN_LOCK.md`
+4. `.private_docs/specbackfill_business_product_year_pack_v1/.agent/03_NON_OVERLAP_LOCK.md`
+5. `.private_docs/specbackfill_business_product_year_pack_v1/.agent/04_BUSINESS_STOPLIGHT_THRESHOLDS.md`
+6. `.private_docs/specbackfill_business_product_year_pack_v1/.agent/05_ADVERSARIAL_BUSINESS_LOOP.md`
+7. `.private_docs/specbackfill_business_product_year_pack_v1/.agent/06_IMPLEMENTATION_STOP_RULES.md`
+
+Product lock:
+
+- `specbackfill` is a local-first deterministic change-contract compiler and change-obligation evidence layer.
+- First user value is catching forgotten companion work before PR.
+- Enterprise value is evidence, policy, support, and airgap operation, not compliance theater.
+
+Hard stop if a change:
+
+- turns the product into a broad linter, probabilistic code reviewer, PR comment bot, or review-firewall clone;
+- claims SOC 2, ISO, merge-safety, or repository-wide completeness guarantees;
+- adds dashboard, marketplace, or OEM work before dogfood and pilot thresholds justify it;
+- creates warnings without next actions;
+- makes draft scaffolds satisfy obligations by themselves;
+- paywalls basic core trust in a way that harms OSS adoption.
+
+When this local pack exists, run:
+
+```bash
+python3 .private_docs/specbackfill_business_product_year_pack_v1/scripts/check_business_strategy_lock.py --repo-root . --strict
+```

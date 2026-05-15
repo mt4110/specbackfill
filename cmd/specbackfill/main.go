@@ -11,6 +11,7 @@ import (
 	"github.com/mt4110/specbackfill/internal/checkcmd"
 	"github.com/mt4110/specbackfill/internal/fixturecmd"
 	"github.com/mt4110/specbackfill/internal/rulescmd"
+	"github.com/mt4110/specbackfill/internal/todocmd"
 )
 
 const defaultVersion = "v0"
@@ -48,6 +49,13 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return checkcmd.RunWithOptions(ctx, cwd, args[1:], stdout, stderr, checkcmd.Options{
 			ToolVersion: effectiveVersion(),
 		})
+	case "todo":
+		cwd, err := os.Getwd()
+		if err != nil {
+			fmt.Fprintf(stderr, "error: determine working directory: %v\n", err)
+			return 2
+		}
+		return todocmd.Run(ctx, cwd, args[1:], stdout, stderr)
 	case "rules":
 		return rulescmd.Run(args[1:], stdout, stderr)
 	case "fixtures":
@@ -98,6 +106,7 @@ func cleanBuildValue(value string) string {
 func writeUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage: specbackfill --version")
 	fmt.Fprintln(w, "       specbackfill check [flags]")
+	fmt.Fprintln(w, "       specbackfill todo [flags]")
 	fmt.Fprintln(w, "       specbackfill rules list")
 	fmt.Fprintln(w, "       specbackfill rules show <RULE_ID>")
 	fmt.Fprintln(w, "       specbackfill fixtures report")

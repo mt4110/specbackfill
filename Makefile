@@ -30,7 +30,7 @@ PILOT_EVAL_ARGS ?= --allow-small-sample --local-ai-review-import yes
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install trial test test-mise release-smoke check pr patch summary json md rules rule fixtures pilot-eval
+.PHONY: help install trial test test-mise release-smoke check pr patch summary json md todo rules rule fixtures pilot-eval
 
 help:
 	@printf '%s\n' \
@@ -43,6 +43,7 @@ help:
 		'  make summary                Show summary for BASE/HEAD' \
 		'  make json                   Show JSON report for BASE/HEAD' \
 		'  make md                     Show Markdown report for BASE/HEAD' \
+		'  make todo                   Show action list for the working tree diff' \
 		'  make rules                  List implemented rules' \
 		'  make rule [RULE=DB001]      Show one rule' \
 		'  make fixtures               Show fixture coverage' \
@@ -126,6 +127,9 @@ json:
 
 md:
 	@$(SPECBACKFILL) check --base "$(BASE)" --head "$(HEAD)" --format markdown --fail-on off
+
+todo:
+	@$(SPECBACKFILL) todo --fail-on off
 
 rules:
 	@$(SPECBACKFILL) rules list
