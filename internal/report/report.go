@@ -34,10 +34,11 @@ func Build(repoProfile model.RepoProfile, findings []model.Finding) model.Report
 }
 
 type ObligationArtifactOptions struct {
-	InputKind string
-	Base      string
-	Head      string
-	DiffInput []byte
+	ToolVersion string
+	InputKind   string
+	Base        string
+	Head        string
+	DiffInput   []byte
 }
 
 func BuildObligationArtifact(options ObligationArtifactOptions, obligations []model.Obligation) model.ObligationArtifact {
@@ -53,7 +54,7 @@ func BuildObligationArtifact(options ObligationArtifactOptions, obligations []mo
 		SchemaVersion: "obligations.v1",
 		Tool: model.ToolMetadata{
 			Name:    "specbackfill",
-			Version: "v0",
+			Version: toolVersion(options.ToolVersion),
 		},
 		Run: model.RunMetadata{
 			RunID:           runID,
@@ -64,6 +65,14 @@ func BuildObligationArtifact(options ObligationArtifactOptions, obligations []mo
 		},
 		Obligations: withIDs,
 	}
+}
+
+func toolVersion(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "v0"
+	}
+	return trimmed
 }
 
 func BuildLocalAIReviewImportItems(artifact model.ObligationArtifact) []model.LocalAIReviewImportItem {

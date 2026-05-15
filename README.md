@@ -44,6 +44,10 @@ specbackfill は `local-ai-review` や `review-firewall` とは別物です。de
 ## v0 の契約
 
 ```bash
+specbackfill --version
+```
+
+```bash
 specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
                   [--format text|json|markdown]
                   [--fail-on error|warn|off]
@@ -87,6 +91,7 @@ specbackfill fixtures report
 
 ```bash
 go install github.com/mt4110/specbackfill/cmd/specbackfill@latest
+specbackfill --version
 specbackfill check --diff-file change.diff --format text --fail-on off
 ```
 
@@ -99,6 +104,19 @@ specbackfill check --fail-on off
 ```
 
 この repository 自体を開発する場合は、`make trial` や `go run ./cmd/specbackfill` でも確認できます。
+
+source build で version metadata を明示する場合は、build-time flags を使います。
+
+```bash
+mkdir -p bin
+VERSION=v0.1.0-alpha
+COMMIT=$(git rev-parse --short HEAD 2>/dev/null || printf unknown)
+BUILT=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+go build -ldflags "-X main.version=$VERSION -X main.commit=$COMMIT -X main.built=$BUILT" -o bin/specbackfill ./cmd/specbackfill
+bin/specbackfill --version
+```
+
+tagged release binary が用意されている場合は、対象 OS/arch の archive と checksums を GitHub Releases から取得し、checksum を確認してから PATH 上に置きます。現時点の主要な install path は `go install` と source build です。
 
 ## CI での利用
 
@@ -180,6 +198,19 @@ mise の task 定義も確認したい場合だけ、追加で `make test-mise` 
 - 品質改善に入る前に `make trial` または `make test` と `make fixtures` で現在地を確認する
 
 繰り返し同じ種類のノイズが見えたら、 blocking に上げる前に fixture hardening と suppression を小さく入れます。
+
+## Release checklist
+
+tag を切る前の最小確認です。pilot thresholds が通るまでは、release copy と CI example は advisory-first のままにします。
+
+```bash
+make test
+python3 scripts/schema_validate_testdata.py --repo-root .
+bash scripts/source_archive_smoke.sh .
+make release-smoke VERSION=v0.1.0-alpha
+```
+
+release binary を作る場合は `--version`、`--emit-obligations` の `tool.version`、`--emit-local-ai-review-import` の `tool_version` が同じ release version を示すことを確認します。checksum は artifact と同じ release に添付し、利用者には検証してから実行する前提で案内します。
 
 ## Pilot scorecard
 

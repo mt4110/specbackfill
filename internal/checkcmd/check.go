@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/mt4110/specbackfill/internal/diffparse"
 	"github.com/mt4110/specbackfill/internal/diffsrc"
@@ -14,7 +15,17 @@ import (
 	"github.com/mt4110/specbackfill/internal/rules"
 )
 
+const defaultToolVersion = "v0"
+
+type Options struct {
+	ToolVersion string
+}
+
 func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Writer) int {
+	return RunWithOptions(ctx, cwd, args, stdout, stderr, Options{})
+}
+
+func RunWithOptions(ctx context.Context, cwd string, args []string, stdout, stderr io.Writer, options Options) int {
 	flags := flag.NewFlagSet("check", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 
@@ -79,12 +90,14 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 		result.Explanations = explain.Build(findings)
 	}
 
+	toolVersion := normalizeToolVersion(options.ToolVersion)
 	if emitObligations {
 		artifact := report.BuildObligationArtifact(report.ObligationArtifactOptions{
-			InputKind: inputKind(base, head, diffFile),
-			Base:      base,
-			Head:      head,
-			DiffInput: diffInput,
+			ToolVersion: toolVersion,
+			InputKind:   inputKind(base, head, diffFile),
+			Base:        base,
+			Head:        head,
+			DiffInput:   diffInput,
 		}, obligations)
 		if err := report.WriteObligationArtifact(stdout, artifact); err != nil {
 			return writeError(stderr, fmt.Sprintf("render obligation artifact: %v", err))
@@ -94,10 +107,11 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 
 	if emitLocalAIReviewImport {
 		artifact := report.BuildObligationArtifact(report.ObligationArtifactOptions{
-			InputKind: inputKind(base, head, diffFile),
-			Base:      base,
-			Head:      head,
-			DiffInput: diffInput,
+			ToolVersion: toolVersion,
+			InputKind:   inputKind(base, head, diffFile),
+			Base:        base,
+			Head:        head,
+			DiffInput:   diffInput,
 		}, obligations)
 		items := report.BuildLocalAIReviewImportItems(artifact)
 		if err := report.WriteLocalAIReviewImport(stdout, items); err != nil {
@@ -106,18 +120,26 @@ func Run(ctx context.Context, cwd string, args []string, stdout, stderr io.Write
 		return report.ExitCode(result.Findings, failOn)
 	}
 
-	options := report.Options{
+	reportOptions := report.Options{
 		SummaryOnly:         summaryOnly,
 		InputSummary:        inputSummary(base, head, diffFile),
 		InputNotes:          inputNotes(base, head, diffFile),
 		AnchorScanAvailable: true,
 		AnchorRuleIDs:       rules.ScanAnchorRuleIDs(diff),
 	}
-	if err := report.WriteWithOptions(stdout, format, diff, result, options); err != nil {
+	if err := report.WriteWithOptions(stdout, format, diff, result, reportOptions); err != nil {
 		return writeError(stderr, fmt.Sprintf("render report: %v", err))
 	}
 
 	return report.ExitCode(result.Findings, failOn)
+}
+
+func normalizeToolVersion(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return defaultToolVersion
+	}
+	return trimmed
 }
 
 func inputKind(base, head, diffFile string) string {

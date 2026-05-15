@@ -44,6 +44,10 @@ specbackfill is not `local-ai-review` or `review-firewall`. specbackfill remains
 ## v0 Contract
 
 ```bash
+specbackfill --version
+```
+
+```bash
 specbackfill check [--base <ref> --head <ref> | --diff-file <file>]
                   [--format text|json|markdown]
                   [--fail-on error|warn|off]
@@ -87,6 +91,7 @@ As a user, install the CLI with `go install`:
 
 ```bash
 go install github.com/mt4110/specbackfill/cmd/specbackfill@latest
+specbackfill --version
 specbackfill check --diff-file change.diff --format text --fail-on off
 ```
 
@@ -99,6 +104,19 @@ specbackfill check --fail-on off
 ```
 
 When developing this repository itself, `make trial` and `go run ./cmd/specbackfill` are also useful.
+
+For a source build with explicit version metadata, pass build-time flags:
+
+```bash
+mkdir -p bin
+VERSION=v0.1.0-alpha
+COMMIT=$(git rev-parse --short HEAD 2>/dev/null || printf unknown)
+BUILT=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+go build -ldflags "-X main.version=$VERSION -X main.commit=$COMMIT -X main.built=$BUILT" -o bin/specbackfill ./cmd/specbackfill
+bin/specbackfill --version
+```
+
+When tagged release binaries are available, download the archive and checksums for your OS/arch from GitHub Releases, verify the checksum, then place the binary on `PATH`. For now, the primary install paths are `go install` and source builds.
 
 ## CI Usage
 
@@ -180,6 +198,19 @@ Start with `specbackfill check --fail-on off` or an equivalent advisory check su
 - `make trial`, or `make test` and `make fixtures`, is checked before moving into quality changes
 
 If the same noisy pattern repeats, harden fixtures and suppressions in a small slice before turning the check into a blocking gate.
+
+## Release Checklist
+
+Before tagging, run this minimum release surface check. Until pilot thresholds pass, release copy and CI examples stay advisory-first.
+
+```bash
+make test
+python3 scripts/schema_validate_testdata.py --repo-root .
+bash scripts/source_archive_smoke.sh .
+make release-smoke VERSION=v0.1.0-alpha
+```
+
+For release binaries, verify that `--version`, `tool.version` in `--emit-obligations`, and `tool_version` in `--emit-local-ai-review-import` all show the same release version. Publish checksums with the artifacts and document verification before execution.
 
 ## Pilot Scorecard
 

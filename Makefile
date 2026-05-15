@@ -16,6 +16,10 @@ PYTHON ?= python3
 SPECBACKFILL := $(GO) run ./cmd/specbackfill
 PREFIX ?= $(HOME)/.local
 BINDIR ?= $(PREFIX)/bin
+VERSION ?= v0
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || printf unknown)
+BUILT ?= $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
+LDFLAGS ?= -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.built=$(BUILT)
 BASE ?= main
 HEAD ?= HEAD
 DIFF ?=
@@ -26,7 +30,7 @@ PILOT_EVAL_ARGS ?= --allow-small-sample --local-ai-review-import yes
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install trial test test-mise check pr patch summary json md rules rule fixtures pilot-eval
+.PHONY: help install trial test test-mise release-smoke check pr patch summary json md rules rule fixtures pilot-eval
 
 help:
 	@printf '%s\n' \
@@ -44,12 +48,14 @@ help:
 		'  make fixtures               Show fixture coverage' \
 		'  make pilot-eval [PILOT_SCORECARD=... PILOT_EVAL_ARGS=...]  Evaluate a pilot scorecard CSV' \
 		'  make test                   Run pure Go/Python tests' \
-		'  make test-mise              Run mise test, then Python/schema checks'
+		'  make test-mise              Run mise test, then Python/schema checks' \
+		'  make release-smoke          Build with version metadata and smoke release output'
 
 install:
 	@mkdir -p "$(BINDIR)"
-	@$(GO) build -o "$(BINDIR)/specbackfill" ./cmd/specbackfill
+	@$(GO) build -ldflags "$(LDFLAGS)" -o "$(BINDIR)/specbackfill" ./cmd/specbackfill
 	@printf 'Installed: %s/specbackfill\n' "$(BINDIR)"
+	@"$(BINDIR)/specbackfill" --version
 	@case ":$$PATH:" in \
 		*:"$(BINDIR)":*) printf 'OK: %s is on PATH.\n' "$(BINDIR)" ;; \
 		*) printf 'Add this to your shell PATH if needed: export PATH="%s:$$PATH"\n' "$(BINDIR)" ;; \
@@ -98,6 +104,9 @@ test-mise:
 	@$(PYTHON) -m unittest discover -s scripts -p '*_test.py'
 	@$(PYTHON) scripts/evaluate_pilot.py examples/pilot_scorecard.sample.csv --allow-small-sample --local-ai-review-import yes >/dev/null
 	@$(PYTHON) scripts/schema_validate_testdata.py --repo-root .
+
+release-smoke:
+	@bash scripts/release_smoke.sh .
 
 check:
 	@$(SPECBACKFILL) check --fail-on off
