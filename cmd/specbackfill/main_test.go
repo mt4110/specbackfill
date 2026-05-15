@@ -24,6 +24,42 @@ func TestRunDispatchesRulesCommand(t *testing.T) {
 	}
 }
 
+func TestRunPrintsVersion(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run(context.Background(), []string{"--version"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run(--version) code = %d, want 0; stderr=%q", code, stderr.String())
+	}
+	if stderr.String() != "" {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	for _, want := range []string{"specbackfill ", "commit=", "built="} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("--version output missing %q:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestRunRejectsVersionArguments(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run(context.Background(), []string{"--version", "extra"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("run(--version extra) code = %d, want 2", code)
+	}
+	if stdout.String() != "" {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "--version does not accept arguments") {
+		t.Fatalf("stderr missing version argument error:\n%s", stderr.String())
+	}
+}
+
 func TestRunDispatchesFixturesCommand(t *testing.T) {
 	t.Parallel()
 
@@ -94,7 +130,10 @@ func TestRunRejectsMissingTopLevelCommand(t *testing.T) {
 	if stdout.String() != "" {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
-	if !strings.Contains(stderr.String(), "usage: specbackfill check [flags]") {
+	if !strings.Contains(stderr.String(), "usage: specbackfill --version") {
+		t.Fatalf("stderr missing version usage:\n%s", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "specbackfill check [flags]") {
 		t.Fatalf("stderr missing usage:\n%s", stderr.String())
 	}
 }

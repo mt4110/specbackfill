@@ -119,6 +119,31 @@ calibration. `review-firewall` owns review-comment triage and routing.
 
 ## 4. Command-Line Interface
 
+### 4.0 Version surface
+
+v0 MUST support:
+
+```bash
+specbackfill --version
+```
+
+The version output SHOULD be a single line that includes the CLI name, tool
+version, commit, and build timestamp:
+
+```text
+specbackfill v0.1.0-alpha commit=<sha> built=<date>
+```
+
+Release builds SHOULD inject version metadata at build time. Source builds MAY
+show `unknown` for commit or build timestamp when that metadata was not
+provided.
+
+The normal findings JSON top-level `version` field remains the v0 output
+contract version. It is not the release binary version. The `tool.version`
+field in `obligations.v1` artifacts and the `tool_version` field in
+`local_ai_review_import.v1` items MUST use the same runtime tool version shown
+by `specbackfill --version`.
+
 ### 4.1 Primary command
 
 ```bash
@@ -1111,7 +1136,9 @@ A conforming v0 implementation of `specbackfill` MUST:
 13. include deterministic omission signatures for emitted findings
 14. treat findings as unresolved companion obligations
 15. support explicit versioned obligation artifact output without changing normal findings JSON
-16. remain phase-limited and conservative in scope
+16. support `specbackfill --version` with build-time version injection for release builds
+17. keep obligation/import tool metadata aligned with the CLI tool version
+18. remain phase-limited and conservative in scope
 
 The quality bar for this product is not breadth.
 It is **precision, explicitness, and honesty about what the diff can actually support**.

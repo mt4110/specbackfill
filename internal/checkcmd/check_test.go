@@ -190,6 +190,60 @@ func TestRunEmitObligationsJSON(t *testing.T) {
 	}
 }
 
+func TestRunEmitArtifactsUseConfiguredToolVersion(t *testing.T) {
+	t.Parallel()
+
+	fixture := writeFixtureCopy(t, "db001_positive.diff")
+	toolVersion := "v9.9.9-test"
+	configuredToolVersion := "  " + toolVersion + "  "
+
+	var obligationsStdout bytes.Buffer
+	var obligationsStderr bytes.Buffer
+	obligationsCode := RunWithOptions(
+		context.Background(),
+		t.TempDir(),
+		[]string{"--diff-file", fixture, "--emit-obligations", "--fail-on", "off"},
+		&obligationsStdout,
+		&obligationsStderr,
+		Options{ToolVersion: configuredToolVersion},
+	)
+	if obligationsCode != 0 {
+		t.Fatalf("RunWithOptions(--emit-obligations) code = %d, want 0; stderr=%q", obligationsCode, obligationsStderr.String())
+	}
+	var artifact model.ObligationArtifact
+	if err := json.Unmarshal(obligationsStdout.Bytes(), &artifact); err != nil {
+		t.Fatalf("json.Unmarshal(obligations) error = %v\n%s", err, obligationsStdout.String())
+	}
+	if artifact.Tool.Version != toolVersion {
+		t.Fatalf("artifact tool version = %q, want %q", artifact.Tool.Version, toolVersion)
+	}
+
+	var importStdout bytes.Buffer
+	var importStderr bytes.Buffer
+	importCode := RunWithOptions(
+		context.Background(),
+		t.TempDir(),
+		[]string{"--diff-file", fixture, "--emit-local-ai-review-import", "--fail-on", "off"},
+		&importStdout,
+		&importStderr,
+		Options{ToolVersion: configuredToolVersion},
+	)
+	if importCode != 0 {
+		t.Fatalf("RunWithOptions(--emit-local-ai-review-import) code = %d, want 0; stderr=%q", importCode, importStderr.String())
+	}
+	lines := nonEmptyLines(importStdout.String())
+	if len(lines) != 1 {
+		t.Fatalf("JSONL lines = %d, want 1\n%s", len(lines), importStdout.String())
+	}
+	var item model.LocalAIReviewImportItem
+	if err := json.Unmarshal([]byte(lines[0]), &item); err != nil {
+		t.Fatalf("json.Unmarshal(import item) error = %v\n%s", err, lines[0])
+	}
+	if item.ToolVersion != toolVersion {
+		t.Fatalf("import tool version = %q, want %q", item.ToolVersion, toolVersion)
+	}
+}
+
 func TestRunEmitObligationsMixedDB001StatusAndIDStability(t *testing.T) {
 	t.Parallel()
 
